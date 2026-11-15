@@ -1,24 +1,38 @@
 import { BRAND } from '@pb/shared'
 
+const BRACKETS = 'M9.6 11 5.6 16l4 5M22.4 11l4 5-4 5'
+const LETTER_P = 'M12.5 22.2V9.8h3.2a3.85 3.85 0 0 1 0 7.7h-3.2'
+
 export function BrandMark({ className = 'size-8' }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden focusable="false">
-      <defs>
-        <linearGradient id="pl-mark" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffc861" />
-          <stop offset="1" stopColor="#f5a524" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="8" fill="url(#pl-mark)" />
-      <path
-        d="M11 24V8h6.2a5 5 0 0 1 0 10H15"
+      <rect width="32" height="32" rx="8" fill="#0d0d0d" />
+      <rect
+        x="0.5"
+        y="0.5"
+        width="31"
+        height="31"
+        rx="7.5"
         fill="none"
-        stroke="#080808"
-        strokeWidth="3"
+        stroke="#f5f2ec"
+        strokeOpacity="0.12"
+      />
+      <path
+        d={BRACKETS}
+        fill="none"
+        stroke="var(--color-teal, #2dd4bf)"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="21.5" cy="23" r="2.5" fill="#080808" />
+      <path
+        d={LETTER_P}
+        fill="none"
+        stroke="var(--color-amber, #f5a524)"
+        strokeWidth="2.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
