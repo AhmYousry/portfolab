@@ -46,11 +46,15 @@ const POSTHOG_HOST =
 const REPLAY_ALLOWED = import.meta.env.VITE_POSTHOG_REPLAY_ENABLED === 'true'
 
 type Loader = () => Promise<PostHog>
+type IdentityUser = Pick<PublicUser, 'id' | 'role' | 'hasPro'>
 let loadPosthog: Loader = () => import('posthog-js').then((m) => m.default)
 let client: PostHog | null = null
 let loading: Promise<PostHog | null> | null = null
 let currentConsent: ConsentState | null = null
+let currentUser: IdentityUser | null = null
 let identifiedId: string | null = null
+let lastRoute: { pathname: string; search: string } | null = null
+let pageviewSentFor: string | null = null
 const queue: Array<(ph: PostHog) => void> = []
 
 function safeGet(storage: Storage, key: string): string | null {
@@ -154,6 +158,14 @@ export function posthogConfig(consent: ConsentState): Partial<PostHogConfig> {
   }
 }
 
+function syncReplay(ph: PostHog, pathname: string) {
+  if (REPLAY_ALLOWED && currentConsent?.replay && !isReplayBlocked(pathname)) {
+    ph.startSessionRecording()
+  } else {
+    ph.stopSessionRecording()
+  }
+}
+
 async function ensureClient(): Promise<PostHog | null> {
   if (client) return client
   if (!POSTHOG_KEY || !currentConsent?.analytics) return null
@@ -161,7 +173,9 @@ async function ensureClient(): Promise<PostHog | null> {
     .then((ph) => {
       if (!currentConsent?.analytics) return null
       ph.init(POSTHOG_KEY, posthogConfig(currentConsent))
+      if (ph.has_opted_out_capturing()) ph.opt_in_capturing({ captureEventName: false })
       ph.register(superProperties())
+      syncReplay(ph, window.location.pathname)
       client = ph
       for (const fn of queue.splice(0)) safely(() => fn(ph))
       return ph
@@ -180,32 +194,55 @@ function withClient(fn: (ph: PostHog) => void) {
   void ensureClient()
 }
 
+function sendIdentify(ph: PostHog) {
+  if (!currentUser || identifiedId === currentUser.id) return
+  ph.identify(
+    currentUser.id,
+    sanitizeProperties({ role: currentUser.role, plan: currentUser.hasPro ? 'pro' : 'free' }),
+  )
+  identifiedId = currentUser.id
+}
+
+function sendPageview(ph: PostHog, pathname: string, search: string) {
+  const path = scrubUrl(`${pathname}${search}`)
+  if (pageviewSentFor === path) return
+  ph.register(superProperties())
+  ph.capture('$pageview', { $current_url: scrubUrl(window.location.href), path })
+  pageviewSentFor = path
+}
+
+function onConsentGranted() {
+  withClient((ph) => {
+    sendIdentify(ph)
+    if (lastRoute) sendPageview(ph, lastRoute.pathname, lastRoute.search)
+  })
+}
+
 function applyConsent(state: ConsentState | null) {
+  const wasGranted = currentConsent?.analytics === true
   currentConsent = state
   if (!state?.analytics) {
     queue.length = 0
+    identifiedId = null
+    pageviewSentFor = null
     if (client) {
       const ph = client
       safely(() => {
         ph.stopSessionRecording()
-        ph.opt_out_capturing()
         ph.reset()
+        ph.opt_out_capturing()
       })
-      client = null
     }
     return
   }
   if (client) {
     const ph = client
     safely(() => {
-      ph.opt_in_capturing()
-      if (REPLAY_ALLOWED && state.replay && !isReplayBlocked(window.location.pathname))
-        ph.startSessionRecording()
-      else ph.stopSessionRecording()
+      ph.opt_in_capturing({ captureEventName: false })
+      syncReplay(ph, window.location.pathname)
     })
-    return
   }
-  void ensureClient()
+  if (!wasGranted) onConsentGranted()
 }
 
 export function initAnalytics() {
@@ -224,40 +261,32 @@ export const analytics = {
   },
 
   pageview(pathname: string, search: string) {
-    const path = scrubUrl(`${pathname}${search}`)
-    withClient((ph) => {
-      ph.register(superProperties())
-      ph.capture('$pageview', { $current_url: scrubUrl(window.location.href), path })
-    })
+    lastRoute = { pathname, search }
+    withClient((ph) => sendPageview(ph, pathname, search))
   },
 
-  identify(user: Pick<PublicUser, 'id' | 'role' | 'hasPro'>) {
-    if (identifiedId === user.id) return
-    identifiedId = user.id
-    withClient((ph) =>
-      ph.identify(
-        user.id,
-        sanitizeProperties({ role: user.role, plan: user.hasPro ? 'pro' : 'free' }),
-      ),
-    )
+  identify(user: IdentityUser) {
+    currentUser = user
+    withClient(sendIdentify)
   },
 
   reset() {
+    currentUser = null
     identifiedId = null
     queue.length = 0
     if (client) {
       const ph = client
-      safely(() => ph.reset())
+      safely(() => {
+        ph.reset()
+        if (!currentConsent?.analytics) ph.opt_out_capturing()
+      })
     }
   },
 
   syncReplayForPath(pathname: string) {
-    if (!client || !REPLAY_ALLOWED || !currentConsent?.replay) return
+    if (!client || !currentConsent?.analytics) return
     const ph = client
-    safely(() => {
-      if (isReplayBlocked(pathname)) ph.stopSessionRecording()
-      else ph.startSessionRecording()
-    })
+    safely(() => syncReplay(ph, pathname))
   },
 }
 
@@ -317,6 +346,9 @@ export function __setPosthogLoaderForTests(loader: Loader) {
   loadPosthog = loader
   client = null
   loading = null
+  currentUser = null
   identifiedId = null
+  lastRoute = null
+  pageviewSentFor = null
   queue.length = 0
 }

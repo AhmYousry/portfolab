@@ -133,6 +133,11 @@ test('student: signup → enroll → checkpoint → progress survives logout/log
 
   await page.goto('/admin')
   await expect(page.getByText('الصفحة دي للأدمن بس.')).toBeVisible()
+
+  await page.goto(
+    '/checkout/status?purchase=cmnotreal12345&id=192036465&source_data.pan=2346&source_data.sub_type=MasterCard&hmac=abc',
+  )
+  await expect(page).toHaveURL(/\/checkout\/status\?purchase=cmnotreal12345$/)
 })
 
 test('admin: overview, content tree and lesson preview', async ({ page }) => {

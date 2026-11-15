@@ -26,7 +26,7 @@ No personal API key (`phx_…`) is needed by the app. Never put a personal API k
 ## 3. How it works
 
 - **Single entry point:** `apps/web/src/lib/analytics.ts` (`analytics.capture / pageview / identify / reset`) and `apps/api/src/services/product-analytics.ts` (`captureForUser`). No other file imports PostHog.
-- **Consent first:** the PostHog SDK is not even downloaded until the visitor clicks "موافق" in the banner. Declining or later revoking calls `opt_out_capturing()` + `reset()`. Logged-in users' choice is stored server-side (`User.analyticsConsent`); the API only sends server events for users who consented.
+- **Consent first:** the PostHog SDK is not even downloaded until the visitor clicks "موافق" in the banner. Revoking calls `reset()` **then** `opt_out_capturing()` (in posthog-js, `reset()` clears a previous opt-out, so the order matters). The SDK instance is kept, and re-granting calls `opt_in_capturing()`, re-identifies the current user and sends a `$pageview` for the current page. A persisted opt-out is cleared at init when consent is granted. On `/checkout/status` every query parameter except `purchase` is removed from URLs before sending, and from the address bar. Logged-in users' choice is stored server-side (`User.analyticsConsent`); the API only sends server events for users who consented.
 - **Pageviews:** manual `$pageview` on every SPA route change (`useAnalyticsRouting` in `Layout`).
 - **Autocapture:** clicks/submits/changes on `a`, `button`, `form`, `select`, `label`. Important elements carry stable `data-attr` ids (below). Auth, checkout and account forms have `ph-no-capture`.
 - **Identity:** `identify(user.id, { role, plan })` — internal cuid only, never email/name. `reset()` on logout. `person_profiles: 'identified_only'`.

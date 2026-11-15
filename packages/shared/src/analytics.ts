@@ -123,9 +123,22 @@ export function sanitizeProperties(props: Record<string, unknown> | undefined): 
   return out
 }
 
+// Routes that receive third-party query strings (e.g. Paymob's redirect appends card brand,
+// masked PAN, amounts and transaction ids). Only the listed keys survive on these routes.
+export const ROUTE_QUERY_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
+  '/checkout/status': ['purchase'],
+}
+
 export function scrubUrl(raw: string): string {
   try {
     const url = new URL(raw, 'http://placeholder.invalid')
+    const route = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname
+    const allowedKeys = ROUTE_QUERY_ALLOWLIST[route]
+    if (allowedKeys) {
+      for (const key of [...url.searchParams.keys()]) {
+        if (!allowedKeys.includes(key)) url.searchParams.delete(key)
+      }
+    }
     for (const param of SECRET_QUERY_PARAMS) {
       if (url.searchParams.has(param)) url.searchParams.set(param, 'REDACTED')
     }

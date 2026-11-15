@@ -26,6 +26,20 @@ describe('scrubUrl', () => {
     )
     expect(scrubUrl('/plain')).toBe('/plain')
   })
+
+  it('keeps only allowlisted query keys on /checkout/status (Paymob redirect params)', () => {
+    const paymobRedirect =
+      '/checkout/status?purchase=cm123&id=192036465&success=true&amount_cents=24900' +
+      '&source_data.pan=2346&source_data.sub_type=MasterCard&order=217503754&hmac=abc'
+    expect(scrubUrl(paymobRedirect)).toBe('/checkout/status?purchase=cm123')
+    expect(scrubUrl(`https://portfolab.test${paymobRedirect}`)).toBe(
+      'https://portfolab.test/checkout/status?purchase=cm123',
+    )
+    expect(scrubUrl('/checkout/status/?purchase=cm1&source_data.pan=1')).toBe(
+      '/checkout/status/?purchase=cm1',
+    )
+    expect(scrubUrl('/projects/x?utm_source=ig')).toBe('/projects/x?utm_source=ig')
+  })
 })
 
 describe('checkoutSessionSchema', () => {

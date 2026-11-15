@@ -161,10 +161,15 @@ interface PurchaseStatus {
 }
 
 export function CheckoutStatus() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const purchaseId = params.get('purchase') ?? ''
   const [polls, setPolls] = useState(0)
   const valid = /^[a-z0-9]{10,40}$/i.test(purchaseId)
+
+  useEffect(() => {
+    const hasProviderParams = [...params.keys()].some((key) => key !== 'purchase')
+    if (hasProviderParams) setParams({ purchase: purchaseId }, { replace: true })
+  }, [params, purchaseId, setParams])
 
   const { data, isError, refetch } = useQuery({
     queryKey: ['checkout-status', purchaseId, polls >= POLLS_BEFORE_RECONCILE],

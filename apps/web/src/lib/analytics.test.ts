@@ -14,6 +14,7 @@ function fakePosthog() {
     opt_in_capturing: vi.fn(),
     startSessionRecording: vi.fn(),
     stopSessionRecording: vi.fn(),
+    has_opted_out_capturing: vi.fn(() => false),
   }
 }
 
@@ -71,17 +72,101 @@ describe('consent gating', () => {
     })
   })
 
-  it('revoking consent opts out, stops replay and resets identity', async () => {
+  it('revoking consent resets identity and THEN opts out (reset would undo an earlier opt-out)', async () => {
     consent.setConsent({ analytics: true, replay: false })
     await flush()
     consent.setConsent({ analytics: false, replay: false })
-    expect(ph.opt_out_capturing).toHaveBeenCalled()
     expect(ph.stopSessionRecording).toHaveBeenCalled()
     expect(ph.reset).toHaveBeenCalled()
+    expect(ph.opt_out_capturing).toHaveBeenCalled()
+    expect(ph.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      ph.opt_out_capturing.mock.invocationCallOrder[0] ?? 0,
+    )
     ph.capture.mockClear()
     mod.analytics.capture('pro_page_viewed', { source: 'pricing' })
     await flush()
     expect(ph.capture).not.toHaveBeenCalled()
+  })
+
+  it('H-2: re-granting consent opts back in on the same client without re-initializing', async () => {
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    consent.setConsent({ analytics: false, replay: false })
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    expect(ph.init).toHaveBeenCalledTimes(1)
+    expect(ph.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false })
+    mod.analytics.capture('pro_page_viewed', { source: 'pricing' })
+    expect(ph.capture).toHaveBeenLastCalledWith(
+      'pro_page_viewed',
+      expect.objectContaining({ source: 'pricing' }),
+    )
+  })
+
+  it('H-2: a persisted SDK opt-out is cleared at init when consent is granted', async () => {
+    ph.has_opted_out_capturing.mockReturnValue(true)
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    expect(ph.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false })
+  })
+
+  it('H-1: a user identified before consent is identified once consent is granted', async () => {
+    mod.analytics.identify({ id: 'user_before_consent', role: 'STUDENT', hasPro: false })
+    await flush()
+    expect(ph.identify).not.toHaveBeenCalled()
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    expect(ph.identify).toHaveBeenCalledTimes(1)
+    expect(ph.identify).toHaveBeenCalledWith('user_before_consent', {
+      role: 'STUDENT',
+      plan: 'free',
+    })
+  })
+
+  it('H-1: after revoke and re-grant the user is identified again', async () => {
+    consent.setConsent({ analytics: true, replay: false })
+    mod.analytics.identify({ id: 'u_regrant', role: 'STUDENT', hasPro: true })
+    await flush()
+    consent.setConsent({ analytics: false, replay: false })
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    expect(ph.identify).toHaveBeenCalledTimes(2)
+    expect(ph.identify).toHaveBeenLastCalledWith('u_regrant', { role: 'STUDENT', plan: 'pro' })
+  })
+
+  it('H-4: the page visible when consent is granted gets exactly one $pageview', async () => {
+    mod.captureUtm('?utm_source=instagram&utm_campaign=reel-09')
+    mod.analytics.pageview('/', '?utm_source=instagram&utm_campaign=reel-09')
+    await flush()
+    expect(ph.capture).not.toHaveBeenCalled()
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    const pageviews = ph.capture.mock.calls.filter(([event]) => event === '$pageview')
+    expect(pageviews).toHaveLength(1)
+    expect(pageviews[0]?.[1]).toMatchObject({ path: '/?utm_source=instagram&utm_campaign=reel-09' })
+    expect(ph.register).toHaveBeenCalledWith(
+      expect.objectContaining({ utm_source: 'instagram', utm_campaign: 'reel-09' }),
+    )
+    mod.analytics.pageview('/', '?utm_source=instagram&utm_campaign=reel-09')
+    expect(ph.capture.mock.calls.filter(([event]) => event === '$pageview')).toHaveLength(1)
+  })
+
+  it('H-4: when consent already exists, the first route still produces one pageview', async () => {
+    await load()
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    mod.analytics.pageview('/pricing', '')
+    await flush()
+    expect(ph.capture.mock.calls.filter(([event]) => event === '$pageview')).toHaveLength(1)
+  })
+
+  it('logout while consent is revoked keeps the SDK opted out', async () => {
+    consent.setConsent({ analytics: true, replay: false })
+    await flush()
+    consent.setConsent({ analytics: false, replay: false })
+    ph.opt_out_capturing.mockClear()
+    mod.analytics.reset()
+    expect(ph.opt_out_capturing).toHaveBeenCalledTimes(1)
   })
 
   it('queues events captured right after consent until the SDK loads', async () => {
