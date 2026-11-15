@@ -1,0 +1,28 @@
+{
+  "slug": "taskflow-lite",
+  "title": "TaskFlow Lite",
+  "tagline": "أول مشروع Full Stack حقيقي ليك: React + Express + PostgreSQL",
+  "description": "Task manager شخصي كامل: frontend بـ React، REST API بـ Express، قاعدة بيانات PostgreSQL مع Prisma، validation بـ Zod، tests، وREADME محترم تقدر تحطه في البورتفوليو وتشرحه في الإنترفيو.",
+  "level": "مبتدئ ← Junior",
+  "tier": "FREE",
+  "status": "PUBLISHED",
+  "estimatedHours": "8–12 ساعة (تقدير مبدئي، هنراجعه مع أول دفعة طلاب)",
+  "order": 1,
+  "outcomes": [
+    "تبني API كامل (CRUD + فلترة + بحث + ترتيب) وتعرف تبرر كل status code",
+    "تصمم data model وmigrations بـ Prisma",
+    "تبني UI بيتعامل صح مع loading وempty وerror وvalidation",
+    "تكتب integration tests بتثبت إن الـ API شغال صح",
+    "تطلع repo نضيف بـ README وdeployment guide من غير ما تسرب أي secrets",
+    "تشرح قراراتك التقنية بثقة في الإنترفيو"
+  ],
+  "skills": ["React", "Express", "PostgreSQL", "Prisma", "Zod", "REST", "Vitest", "Supertest", "Git"],
+  "modules": [
+    { "key": "01-define", "title": "حدد المشكلة", "description": "User stories، الـ scope، wireframe، وشكل الـ architecture.", "order": 1, "status": "PUBLISHED" },
+    { "key": "02-workspace", "title": "جهز الـ workspace", "description": "Frontend وbackend وdatabase شغالين وhealth check ناجح.", "order": 2, "status": "PUBLISHED" },
+    { "key": "03-api", "title": "ابني الـ API", "description": "Data model، API contract، validation، وCRUD.", "order": 3, "status": "PUBLISHED" },
+    { "key": "04-ui", "title": "ابني الـ UI", "description": "Components، forms، filters، وحالات الـ loading/empty/error.", "order": 4, "status": "PUBLISHED" },
+    { "key": "05-integrate-test", "title": "اربط واختبر", "description": "اربط الـ frontend بالـ API واكتب tests بتثبت إن كله شغال.", "order": 5, "status": "PUBLISHED" },
+    { "key": "06-ship", "title": "اشحن واشرح", "description": "Security review، deployment، README، وتحضير الإنترفيو.", "order": 6, "status": "PUBLISHED" }
+  ]
+}

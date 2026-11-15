@@ -1,0 +1,23 @@
+{
+  "slug": "issueforge",
+  "title": "IssueForge",
+  "tagline": "Bug & issue tracker بـ audit trail وتقارير",
+  "description": "Issue lifecycle، severity/priority، assignments، بحث وفلترة آمنة، comments، audit trail، وتقارير. بدون رفع ملفات في أول إصدار.",
+  "level": "Advanced Junior",
+  "tier": "PRO",
+  "status": "COMING_SOON",
+  "estimatedHours": "30–45 ساعة (تقدير مبدئي)",
+  "order": 4,
+  "outcomes": ["Indexing وpagination", "Audit logs", "Performance testing وsecurity review"],
+  "skills": ["Indexing", "Audit logs", "Safe filtering", "Performance testing"],
+  "modules": [
+    { "key": "01-domain", "title": "Domain model", "order": 1, "status": "COMING_SOON" },
+    { "key": "02-apis", "title": "APIs", "order": 2, "status": "COMING_SOON" },
+    { "key": "03-filters", "title": "Filters", "order": 3, "status": "COMING_SOON" },
+    { "key": "04-audit", "title": "Audit log", "order": 4, "status": "COMING_SOON" },
+    { "key": "05-tests", "title": "Tests", "order": 5, "status": "COMING_SOON" },
+    { "key": "06-performance", "title": "Performance", "order": 6, "status": "COMING_SOON" },
+    { "key": "07-deploy", "title": "Deployment", "order": 7, "status": "COMING_SOON" },
+    { "key": "08-interview", "title": "Interview pack", "order": 8, "status": "COMING_SOON" }
+  ]
+}

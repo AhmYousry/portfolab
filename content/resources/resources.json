@@ -1,0 +1,80 @@
+[
+  {
+    "key": "taskflow-brief",
+    "projectSlug": "taskflow-lite",
+    "title": "Project brief — TaskFlow Lite",
+    "description": "المشكلة، الـ scope، الـ features المطلوبة، والـ acceptance criteria في صفحة واحدة.",
+    "type": "DOCUMENT",
+    "storageKey": "taskflow-lite/project-brief.md",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 1
+  },
+  {
+    "key": "taskflow-prompts",
+    "projectSlug": "taskflow-lite",
+    "title": "10 AI mentor prompts (F01–F10)",
+    "description": "Prompts عملية بتخلي الـ AI يعلمك ويراجعك بدل ما يكتب المشروع مكانك.",
+    "type": "PROMPTS",
+    "storageKey": "taskflow-lite/ai-prompts.md",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 2
+  },
+  {
+    "key": "taskflow-starter",
+    "projectSlug": "taskflow-lite",
+    "title": "Starter repo (with TODOs)",
+    "description": "نقطة البداية: الـ workspace جاهز، والـ TODOs مربوطة بالموديولز. مش الحل.",
+    "type": "REPO_ZIP",
+    "storageKey": "examples/taskflow-lite/starter",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 3
+  },
+  {
+    "key": "taskflow-worksheet",
+    "projectSlug": "taskflow-lite",
+    "title": "API contract & data model worksheet",
+    "description": "جداول تملاها بنفسك قبل ما تكتب الكود.",
+    "type": "TEMPLATE",
+    "storageKey": "taskflow-lite/api-contract-worksheet.md",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 4
+  },
+  {
+    "key": "taskflow-readme-template",
+    "projectSlug": "taskflow-lite",
+    "title": "Portfolio README template",
+    "description": "هيكل README محترم وصادق تقدر تستخدمه لأي مشروع.",
+    "type": "TEMPLATE",
+    "storageKey": "taskflow-lite/readme-template.md",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 5
+  },
+  {
+    "key": "taskflow-deploy-checklist",
+    "projectSlug": "taskflow-lite",
+    "title": "Deployment & security checklist",
+    "description": "قبل ما تنشر: secrets، migrations، CORS، health check، وbudget.",
+    "type": "CHECKLIST",
+    "storageKey": "taskflow-lite/deployment-checklist.md",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 6
+  },
+  {
+    "key": "taskflow-reference",
+    "projectSlug": "taskflow-lite",
+    "title": "Reference solution (spoiler)",
+    "description": "الحل الكامل المختبر. بيتفتح بعد ما تخلص checkpoints درس \"ابني الـ CRUD endpoints\". قارن بيه، متنسخش.",
+    "type": "REPO_ZIP",
+    "storageKey": "examples/taskflow-lite/reference",
+    "tier": "FREE",
+    "status": "PUBLISHED",
+    "order": 7,
+    "unlockLesson": { "projectSlug": "taskflow-lite", "lessonSlug": "crud-endpoints" }
+  }
+]

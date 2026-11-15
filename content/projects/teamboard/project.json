@@ -1,0 +1,23 @@
+{
+  "slug": "teamboard",
+  "title": "TeamBoard",
+  "tagline": "Project manager جماعي بـ teams وroles وKanban",
+  "description": "Teams، invitations، roles (owner/member)، projects، tasks، assignees، comments، Kanban، pagination، وactivity stream، مع ضمان إن مفيش team تشوف بيانات team تانية.",
+  "level": "Intermediate",
+  "tier": "PRO",
+  "status": "COMING_SOON",
+  "estimatedHours": "25–35 ساعة (تقدير مبدئي)",
+  "order": 3,
+  "outcomes": ["RBAC وmulti-tenant authorization", "Relational queries معقدة", "Integration tests للصلاحيات"],
+  "skills": ["RBAC", "Multi-tenancy", "Kanban UI", "Concurrency basics"],
+  "modules": [
+    { "key": "01-permissions", "title": "Permissions matrix", "order": 1, "status": "COMING_SOON" },
+    { "key": "02-model", "title": "Relational model", "order": 2, "status": "COMING_SOON" },
+    { "key": "03-membership", "title": "Team membership", "order": 3, "status": "COMING_SOON" },
+    { "key": "04-crud", "title": "CRUD", "order": 4, "status": "COMING_SOON" },
+    { "key": "05-collaboration", "title": "Collaboration", "order": 5, "status": "COMING_SOON" },
+    { "key": "06-tests", "title": "Tests", "order": 6, "status": "COMING_SOON" },
+    { "key": "07-deploy", "title": "Deployment", "order": 7, "status": "COMING_SOON" },
+    { "key": "08-interview", "title": "Interview pack", "order": 8, "status": "COMING_SOON" }
+  ]
+}

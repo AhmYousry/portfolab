@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pb
+      POSTGRES_PASSWORD: pb_local_dev_only
+      POSTGRES_DB: portfolio_builder
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pb -d portfolio_builder']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

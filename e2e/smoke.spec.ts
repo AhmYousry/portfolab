@@ -1,0 +1,127 @@
+import { type Page, expect, test } from '@playwright/test'
+
+const PASSWORD = 'e2e-only-password-123'
+
+async function dismissConsent(page: Page) {
+  const decline = page.getByRole('button', { name: 'لأ، شكرًا' })
+  if (await decline.isVisible().catch(() => false)) await decline.click()
+}
+
+async function expectNoHorizontalScroll(page: Page) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  )
+  expect(overflow).toBeLessThanOrEqual(1)
+}
+
+test.describe('anonymous visitor', () => {
+  test('landing is RTL Arabic with a free CTA', async ({ page }) => {
+    await page.goto('/?utm_source=instagram&utm_campaign=e2e')
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('ابدأ تبني')
+    await expect(page.getByRole('link', { name: /ابدأ TaskFlow Lite مجانًا/ })).toBeVisible()
+  })
+
+  test('pricing shows Pro as coming soon with checkout disabled', async ({ page }) => {
+    await page.goto('/pricing')
+    await dismissConsent(page)
+    await expect(page.getByRole('button', { name: /الدفع مش متاح لسه/ })).toBeDisabled()
+    await expect(page.getByText('ExpensePilot · قريبًا')).toBeVisible()
+  })
+
+  test('preview lesson is readable and code stays LTR; other lessons ask for signup', async ({
+    page,
+  }) => {
+    await page.goto('/projects/taskflow-lite/lessons/why-taskflow')
+    await dismissConsent(page)
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('TaskFlow Lite')
+    await expect(page.locator('pre').first()).toHaveAttribute('dir', 'ltr')
+
+    await page.goto('/projects/taskflow-lite/lessons/crud-endpoints')
+    await expect(page.getByRole('heading', { name: 'الدرس ده محتاج حساب مجاني' })).toBeVisible()
+  })
+
+  test('health endpoint is JSON, not the SPA', async ({ request }) => {
+    const res = await request.get('http://localhost:4000/api/health')
+    expect(res.headers()['content-type']).toContain('application/json')
+    expect((await res.json()).data.status).toBe('ok')
+  })
+})
+
+test('student: signup → enroll → checkpoint → progress survives logout/login', async ({ page }) => {
+  const email = `e2e-${Date.now()}@example.test`
+
+  await page.goto('/signup')
+  await dismissConsent(page)
+  await page.getByLabel('اسمك').fill('E2E Student')
+  await page.getByLabel('الإيميل', { exact: true }).fill(email)
+  await page.getByLabel('كلمة المرور', { exact: true }).fill(PASSWORD)
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'اعمل حساب' }).click()
+
+  await expect(page).toHaveURL(/\/onboarding/)
+  await page.getByLabel('هدفك').selectOption('PORTFOLIO')
+  await page.getByRole('button', { name: 'احفظ وكمّل' }).click()
+  await expect(page).toHaveURL(/\/dashboard/)
+
+  await page.goto('/projects/taskflow-lite')
+  await page.getByRole('button', { name: 'ابدأ المشروع' }).click()
+  await expect(page).toHaveURL(/lessons\/why-taskflow/)
+
+  const checkpoint = page.getByRole('checkbox', { name: /كتبت 5 user stories/ })
+  await checkpoint.check()
+  await expect(page.getByText('1 من 2')).toBeVisible()
+
+  await page.getByRole('button', { name: 'تسجيل الخروج' }).click()
+  await expect(page).toHaveURL('/')
+
+  await page.goto('/login')
+  await page.getByLabel('الإيميل', { exact: true }).fill(email)
+  await page.getByLabel('كلمة المرور', { exact: true }).fill(PASSWORD)
+  await page.getByRole('button', { name: 'دخول' }).click()
+  await expect(page).toHaveURL(/\/dashboard/)
+  await expect(page.getByText('الخطوة الجاية')).toBeVisible()
+
+  await page.goto('/projects/taskflow-lite/lessons/why-taskflow')
+  await expect(page.getByRole('checkbox', { name: /كتبت 5 user stories/ })).toBeChecked()
+
+  await page.goto('/admin')
+  await expect(page.getByText('الصفحة دي للأدمن بس.')).toBeVisible()
+})
+
+test('admin: overview, content tree and lesson preview', async ({ page }) => {
+  const email = process.env.SEED_ADMIN_EMAIL
+  const password = process.env.SEED_ADMIN_PASSWORD
+  test.skip(!email || !password, 'SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set')
+
+  await page.goto('/login?next=/admin')
+  await dismissConsent(page)
+  await page.getByLabel('الإيميل', { exact: true }).fill(email ?? '')
+  await page.getByLabel('كلمة المرور', { exact: true }).fill(password ?? '')
+  await page.getByRole('button', { name: 'دخول' }).click()
+  await expect(page).toHaveURL(/\/admin$/)
+  await expect(page.getByText('purchase_confirmed')).toBeVisible()
+
+  await page.getByRole('link', { name: 'المحتوى' }).click()
+  await expect(page.getByRole('heading', { name: 'ExpensePilot' })).toBeVisible()
+  await page.getByRole('link', { name: 'معاينة' }).first().click()
+  await expect(page.getByText('معاينة أدمن')).toBeVisible()
+
+  await page.getByRole('link', { name: 'الطلبات' }).click()
+  await expect(page.getByText('الدفع مش متفعل')).toBeVisible()
+})
+
+test('mobile layout has no horizontal scroll @mobile', async ({ page }) => {
+  for (const path of [
+    '/',
+    '/pricing',
+    '/projects/taskflow-lite',
+    '/projects/taskflow-lite/lessons/why-taskflow',
+  ]) {
+    await page.goto(path)
+    await dismissConsent(page)
+    await expectNoHorizontalScroll(page)
+  }
+  await page.getByRole('button', { name: 'افتح القائمة' }).click()
+  await expect(page.getByRole('link', { name: 'الأسعار' })).toBeVisible()
+})

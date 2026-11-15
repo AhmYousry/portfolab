@@ -1,0 +1,33 @@
+{
+  "name": "ahmed-claude-portfolio-builder",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @pb/api --filter @pb/web dev",
+    "build": "pnpm -r --filter ./apps/* build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @pb/api db:migrate",
+    "db:seed": "pnpm --filter @pb/api db:seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@playwright/test": "1.56.1",
+    "eslint": "9.39.1",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "globals": "16.5.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4"
+  }
+}

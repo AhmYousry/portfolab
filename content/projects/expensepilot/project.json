@@ -1,0 +1,28 @@
+{
+  "slug": "expensepilot",
+  "title": "ExpensePilot",
+  "tagline": "Personal finance tracker بـ auth حقيقي وتقارير",
+  "description": "حسابات، تسجيل دخول آمن، معاملات شخصية، categories، ميزانية شهرية، فلاتر، charts، وتصدير CSV آمن. كل البيانات synthetic، ومفيش أي ربط ببنوك.",
+  "level": "Junior",
+  "tier": "PRO",
+  "status": "COMING_SOON",
+  "estimatedHours": "18–25 ساعة (تقدير مبدئي)",
+  "order": 2,
+  "outcomes": [
+    "Auth وsessions آمنة وowner-only access لكل سجل",
+    "Relational data model وaggregation queries",
+    "Charts وdashboard responsive",
+    "Interview pack وrubric"
+  ],
+  "skills": ["Auth", "Authorization", "PostgreSQL aggregation", "Charts", "Integration tests"],
+  "modules": [
+    { "key": "01-scope", "title": "Product scope", "order": 1, "status": "COMING_SOON" },
+    { "key": "02-data-model", "title": "Data model", "order": 2, "status": "COMING_SOON" },
+    { "key": "03-auth", "title": "Auth", "order": 3, "status": "COMING_SOON" },
+    { "key": "04-transactions", "title": "Transactions", "order": 4, "status": "COMING_SOON" },
+    { "key": "05-reporting", "title": "Reporting", "order": 5, "status": "COMING_SOON" },
+    { "key": "06-tests", "title": "Tests", "order": 6, "status": "COMING_SOON" },
+    { "key": "07-deploy", "title": "Deployment", "order": 7, "status": "COMING_SOON" },
+    { "key": "08-interview", "title": "Interview pack", "order": 8, "status": "COMING_SOON" }
+  ]
+}

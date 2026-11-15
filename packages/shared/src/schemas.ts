@@ -1,0 +1,100 @@
+import { z } from 'zod'
+import { utmSchema } from './analytics.js'
+
+const PASSWORD_MIN = 10
+const PASSWORD_MAX = 128
+const NAME_MAX = 60
+const EMAIL_MAX = 254
+
+export const emailSchema = z.string().trim().toLowerCase().max(EMAIL_MAX).pipe(z.email())
+
+export const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN, `كلمة المرور لازم تكون ${PASSWORD_MIN} حروف على الأقل`)
+  .max(PASSWORD_MAX)
+
+export const displayNameSchema = z.string().trim().min(2).max(NAME_MAX)
+
+export const EXPERIENCE_LEVELS = ['NEW', 'SOME', 'JUNIOR'] as const
+export const LEARNING_GOALS = ['PORTFOLIO', 'LEARNING', 'JOB'] as const
+export const LOCALES = ['ar', 'en'] as const
+
+export const signupSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  displayName: displayNameSchema,
+  acceptPrivacy: z.literal(true, 'لازم توافق على سياسة الخصوصية'),
+  utm: utmSchema.optional(),
+})
+
+export const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1).max(PASSWORD_MAX),
+})
+
+export const forgotPasswordSchema = z.object({ email: emailSchema })
+
+export const resetPasswordSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{64}$/),
+  password: passwordSchema,
+})
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(PASSWORD_MAX),
+  newPassword: passwordSchema,
+})
+
+export const updateProfileSchema = z
+  .object({
+    displayName: displayNameSchema.optional(),
+    locale: z.enum(LOCALES).optional(),
+    experienceLevel: z.enum(EXPERIENCE_LEVELS).nullable().optional(),
+    weeklyHours: z.number().int().min(1).max(60).nullable().optional(),
+    goal: z.enum(LEARNING_GOALS).nullable().optional(),
+    githubUrl: z
+      .url()
+      .max(200)
+      .refine((v) => v.startsWith('https://github.com/'), 'لازم يكون لينك GitHub')
+      .nullable()
+      .optional(),
+  })
+  .strict()
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1).max(PASSWORD_MAX),
+  confirm: z.literal('DELETE'),
+})
+
+export const PROGRESS_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'] as const
+
+export const lessonProgressSchema = z.object({
+  status: z.enum(PROGRESS_STATUSES),
+})
+
+export const checkpointProgressSchema = z.object({
+  status: z.enum(['NOT_STARTED', 'COMPLETED']),
+})
+
+export const slugSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+
+export const idSchema = z.string().min(1).max(40)
+
+export const CONTENT_STATUSES = ['DRAFT', 'COMING_SOON', 'PUBLISHED'] as const
+
+export const adminSetStatusSchema = z.object({
+  status: z.enum(CONTENT_STATUSES),
+  confirm: z.literal(true),
+})
+
+export const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})
+
+export type SignupInput = z.infer<typeof signupSchema>
+export type LoginInput = z.infer<typeof loginSchema>
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>

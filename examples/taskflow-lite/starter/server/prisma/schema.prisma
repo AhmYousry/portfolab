@@ -1,0 +1,17 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TODO (Module 3, lesson "data-model"):
+// 1. Add enums TaskStatus (TODO, IN_PROGRESS, DONE) and TaskPriority (LOW, MEDIUM, HIGH).
+// 2. Add a Task model with: id, title, description?, status, priority, dueDate?, createdAt, updatedAt.
+//    - Pick sensible defaults for status and priority.
+//    - Limit title length at the database level too (hint: @db.VarChar).
+//    - dueDate is a calendar date, not a timestamp (hint: @db.Date).
+// 3. Add indexes for the columns you filter/sort by.
+// 4. Run: npm run db:migrate --workspace server -- --name add-task
