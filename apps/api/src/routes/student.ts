@@ -36,7 +36,7 @@ studentRouter.post('/projects/:slug/enroll', async (req, res) => {
   const project = await prisma.project.findFirst({ where: { slug, status: 'PUBLISHED' } })
   if (!project) throw errors.notFound('المشروع مش متاح للتسجيل')
   if (!(await canAccessTier(user, project.tier))) {
-    throw errors.forbidden('المشروع ده جزء من Portfolio Builder Pro')
+    throw errors.forbidden('المشروع ده جزء من Portfolab Pro')
   }
   const enrollment = await ensureEnrollment(user.id, project.id)
   ok(res, { enrollment: { projectSlug: slug, createdAt: enrollment.createdAt } }, undefined, 201)

@@ -1,5 +1,12 @@
 import { Check, Copy, Eye, EyeOff } from 'lucide-react'
-import { type ComponentProps, type ReactNode, isValidElement, useState } from 'react'
+import {
+  type ComponentProps,
+  type ReactNode,
+  createContext,
+  isValidElement,
+  useContext,
+  useState,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -12,6 +19,11 @@ function textOf(node: ReactNode): string {
   return ''
 }
 
+export type CodeAction = 'copy' | 'reveal'
+const CodeActionContext = createContext<((action: CodeAction, language: string) => void) | null>(
+  null,
+)
+
 function CodeBlock({
   language,
   code,
@@ -23,11 +35,13 @@ function CodeBlock({
 }) {
   const [revealed, setRevealed] = useState(!spoiler)
   const [copied, setCopied] = useState(false)
+  const onAction = useContext(CodeActionContext)
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(code)
       setCopied(true)
+      onAction?.('copy', language)
       setTimeout(() => setCopied(false), COPY_RESET_MS)
     } catch {
       setCopied(false)
@@ -44,7 +58,11 @@ function CodeBlock({
           {spoiler && (
             <button
               type="button"
-              onClick={() => setRevealed((v) => !v)}
+              onClick={() => {
+                if (!revealed) onAction?.('reveal', language)
+                setRevealed((v) => !v)
+              }}
+              data-attr="code-spoiler-toggle"
               aria-expanded={revealed}
               className="inline-flex items-center gap-1 text-amber-2 hover:text-amber"
             >
@@ -60,6 +78,7 @@ function CodeBlock({
             <button
               type="button"
               onClick={copy}
+              data-attr="code-copy"
               className="inline-flex items-center gap-1 hover:text-paper"
             >
               {copied ? (
@@ -103,28 +122,36 @@ function Pre({ children, node }: PreProps) {
   return <CodeBlock language={language} code={code} spoiler={/\bspoiler\b/.test(meta)} />
 }
 
-export function Markdown({ source }: { source: string }) {
+export function Markdown({
+  source,
+  onCodeAction,
+}: {
+  source: string
+  onCodeAction?: (action: CodeAction, language: string) => void
+}) {
   return (
-    <div className="prose-lesson">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          pre: Pre as never,
-          a: ({ href, children }) => {
-            const external = href?.startsWith('http')
-            return (
-              <a
-                href={href}
-                {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              >
-                {children}
-              </a>
-            )
-          },
-        }}
-      >
-        {source}
-      </ReactMarkdown>
-    </div>
+    <CodeActionContext.Provider value={onCodeAction ?? null}>
+      <div className="prose-lesson">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            pre: Pre as never,
+            a: ({ href, children }) => {
+              const external = href?.startsWith('http')
+              return (
+                <a
+                  href={href}
+                  {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                >
+                  {children}
+                </a>
+              )
+            },
+          }}
+        >
+          {source}
+        </ReactMarkdown>
+      </div>
+    </CodeActionContext.Provider>
   )
 }

@@ -6,6 +6,11 @@ import { env } from '../env.js'
 import { errors, ok, param, parse, requireAdmin } from '../http.js'
 import { importContent } from '../services/content-import.js'
 import { buildLessonView, findLessonById } from '../services/lessons.js'
+import { paymobStatus } from '../services/paymob.js'
+import { checkoutAvailability } from '../services/payments.js'
+
+const ACTIVE_WINDOW_DAYS = 30
+const DAY_MS = 24 * 60 * 60 * 1000
 
 export const adminRouter = Router()
 
@@ -53,6 +58,50 @@ adminRouter.get('/overview', async (_req, res) => {
       prisma.purchase.count({ where: { status: 'PAID' } }),
     ],
   )
+  const activeSince = new Date(Date.now() - ACTIVE_WINDOW_DAYS * DAY_MS)
+  const [
+    activeLessonUsers,
+    activeCheckpointUsers,
+    completions,
+    freeLearners,
+    buyers,
+    revenue,
+    refunded,
+    availability,
+  ] = await Promise.all([
+    prisma.lessonProgress.findMany({
+      where: { updatedAt: { gte: activeSince } },
+      distinct: ['userId'],
+      select: { userId: true },
+    }),
+    prisma.checkpointProgress.findMany({
+      where: { updatedAt: { gte: activeSince } },
+      distinct: ['userId'],
+      select: { userId: true },
+    }),
+    prisma.leadEvent.count({
+      where: { event: { in: ['free_project_completed', 'pro_project_completed'] } },
+    }),
+    prisma.enrollment.findMany({
+      where: { project: { tier: 'FREE' } },
+      distinct: ['userId'],
+      select: { userId: true },
+    }),
+    prisma.purchase.findMany({
+      where: { status: 'PAID' },
+      distinct: ['userId'],
+      select: { userId: true },
+    }),
+    prisma.purchase.aggregate({ where: { status: 'PAID' }, _sum: { amountMinor: true } }),
+    prisma.purchase.count({ where: { status: 'REFUNDED' } }),
+    checkoutAvailability(),
+  ])
+  const activeLearners = new Set(
+    [...activeLessonUsers, ...activeCheckpointUsers].map((r) => r.userId),
+  ).size
+  const freeIds = new Set(freeLearners.map((r) => r.userId))
+  const convertedFromFree = buyers.filter((b) => freeIds.has(b.userId)).length
+  const provider = paymobStatus()
   ok(res, {
     totals: {
       users,
@@ -61,8 +110,29 @@ adminRouter.get('/overview', async (_req, res) => {
       checkpointsCompleted,
       paidPurchases: purchases,
     },
+    metrics: {
+      totalUsers: users,
+      activeLearners,
+      activeWindowDays: ACTIVE_WINDOW_DAYS,
+      projectStarts: enrollments,
+      projectCompletions: completions,
+      freeLearners: freeIds.size,
+      convertedFromFree,
+      freeToProConversion: freeIds.size === 0 ? null : convertedFromFree / freeIds.size,
+      confirmedPurchases: purchases,
+      refundedPurchases: refunded,
+      revenueMinor: revenue._sum.amountMinor ?? 0,
+      currency: 'EGP',
+    },
     funnel: await funnel(),
-    checkoutEnabled: false,
+    checkoutEnabled: availability.enabled,
+    checkoutBlockers: availability.blockers,
+    paymob: {
+      mode: provider.mode,
+      configured: provider.configured,
+      missing: provider.missing,
+      liveBlocked: provider.liveBlocked,
+    },
   })
 })
 
@@ -198,11 +268,23 @@ adminRouter.get('/orders', async (req, res) => {
         currency: true,
         createdAt: true,
         paidAt: true,
+        refundedAt: true,
+        failureReason: true,
       },
     }),
     prisma.entitlement.count({ where: { revokedAt: null } }),
   ])
-  ok(res, { purchases, activeEntitlements, checkoutEnabled: false }, { page, pageSize, total })
+  const availability = await checkoutAvailability()
+  ok(
+    res,
+    {
+      purchases,
+      activeEntitlements,
+      checkoutEnabled: availability.enabled,
+      checkoutBlockers: availability.blockers,
+    },
+    { page, pageSize, total },
+  )
 })
 
 function csvCell(value: string | number) {

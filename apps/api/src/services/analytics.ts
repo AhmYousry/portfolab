@@ -24,10 +24,12 @@ export async function track(input: TrackInput) {
   })
 }
 
-export async function trackOnce(input: TrackInput & { userId: string }) {
+export async function trackOnce(input: TrackInput & { userId: string }): Promise<boolean> {
   const exists = await prisma.leadEvent.findFirst({
     where: { event: input.event, userId: input.userId, path: input.path ?? null },
     select: { id: true },
   })
-  if (!exists) await track(input)
+  if (exists) return false
+  await track(input)
+  return true
 }

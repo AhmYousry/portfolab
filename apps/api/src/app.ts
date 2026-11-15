@@ -7,9 +7,11 @@ import { HttpError } from './http.js'
 import { accountRouter } from './routes/account.js'
 import { adminRouter } from './routes/admin.js'
 import { authRouter } from './routes/auth.js'
+import { checkoutRouter } from './routes/checkout.js'
 import { publicRouter } from './routes/public.js'
 import { resourcesRouter } from './routes/resources.js'
 import { studentRouter } from './routes/student.js'
+import { webhooksRouter } from './routes/webhooks.js'
 import { csrfProtection } from './security/csrf.js'
 import { loadSession } from './security/session.js'
 
@@ -27,6 +29,7 @@ export function createApp() {
       credentials: true,
     }),
   )
+  app.use('/api/webhooks', webhooksRouter)
   app.use(express.json({ limit: JSON_LIMIT }))
   app.use(cookieParser())
   app.use(loadSession)
@@ -38,6 +41,7 @@ export function createApp() {
   api.use(studentRouter)
   api.use(resourcesRouter)
   api.use(accountRouter)
+  api.use(checkoutRouter)
   api.use('/admin', adminRouter)
   app.use('/api', api)
 

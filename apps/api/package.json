@@ -15,6 +15,8 @@
     "db:seed": "tsx --env-file-if-exists=.env src/scripts/seed.ts",
     "content:import": "tsx --env-file-if-exists=.env src/scripts/import-content.ts",
     "make-admin": "tsx --env-file-if-exists=.env src/scripts/make-admin.ts",
+    "payments:reconcile": "tsx --env-file-if-exists=.env src/scripts/reconcile-payments.ts",
+    "analytics:purge": "tsx --env-file-if-exists=.env src/scripts/purge-analytics.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -28,6 +30,7 @@
     "express-rate-limit": "8.2.1",
     "gray-matter": "4.0.3",
     "helmet": "8.1.0",
+    "posthog-node": "5.57.2",
     "zod": "4.6.7"
   },
   "devDependencies": {

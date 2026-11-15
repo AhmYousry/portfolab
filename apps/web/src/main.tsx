@@ -9,9 +9,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { App } from './App'
+import { initAnalytics } from './lib/analytics'
 import { ApiRequestError } from './lib/api'
 
 const MAX_RETRIES = 2
+
+initAnalytics()
 
 const queryClient = new QueryClient({
   defaultOptions: {

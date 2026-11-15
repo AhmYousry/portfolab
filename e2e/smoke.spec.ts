@@ -22,11 +22,57 @@ test.describe('anonymous visitor', () => {
     await expect(page.getByRole('link', { name: /ابدأ TaskFlow Lite مجانًا/ })).toBeVisible()
   })
 
+  test('Portfolab branding: title, logo, OG metadata, manifest', async ({ page, request }) => {
+    await page.goto('/')
+    await expect(page).toHaveTitle('Portfolab — Build Real Projects. Prove Your Skills.')
+    await expect(page.getByRole('link', { name: /Portfolab/ }).first()).toBeVisible()
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+      'content',
+      'Portfolab',
+    )
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      '/og-image.png',
+    )
+    const manifest = await request.get('/site.webmanifest')
+    expect((await manifest.json()).short_name).toBe('Portfolab')
+    await dismissConsent(page)
+    await page.goto('/pricing')
+    await expect(page).toHaveTitle('الأسعار · Portfolab')
+  })
+
+  test('analytics consent: nothing loads before choice, choice persists, settings reopen', async ({
+    page,
+  }) => {
+    const posthogRequests: string[] = []
+    page.on('request', (r) => {
+      if (/posthog/i.test(r.url())) posthogRequests.push(r.url())
+    })
+    await page.goto('/')
+    await expect(page.getByTestId('consent-banner')).toBeVisible()
+    await page.getByRole('button', { name: 'لأ، شكرًا' }).click()
+    await expect(page.getByTestId('consent-banner')).toBeHidden()
+    await page.reload()
+    await expect(page.getByTestId('consent-banner')).toBeHidden()
+    expect(await page.evaluate(() => localStorage.getItem('pb_analytics_consent'))).toContain(
+      '"analytics":false',
+    )
+    await page.getByRole('button', { name: 'إعدادات التحليلات' }).click()
+    await expect(page.getByTestId('consent-banner')).toBeVisible()
+    expect(posthogRequests).toEqual([])
+  })
+
   test('pricing shows Pro as coming soon with checkout disabled', async ({ page }) => {
     await page.goto('/pricing')
     await dismissConsent(page)
+    await expect(page.getByRole('heading', { name: 'Portfolab Pro' })).toBeVisible()
     await expect(page.getByRole('button', { name: /الدفع مش متاح لسه/ })).toBeDisabled()
     await expect(page.getByText('ExpensePilot · قريبًا')).toBeVisible()
+  })
+
+  test('checkout page stays closed while payments are not enabled', async ({ page }) => {
+    await page.goto('/checkout')
+    await expect(page).toHaveURL(/\/login\?next=%2Fcheckout/)
   })
 
   test('preview lesson is readable and code stays LTR; other lessons ask for signup', async ({

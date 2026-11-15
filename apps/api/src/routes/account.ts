@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { deleteAccountSchema, updateProfileSchema } from '@pb/shared'
+import { analyticsConsentSchema, deleteAccountSchema, updateProfileSchema } from '@pb/shared'
 import { prisma } from '../db.js'
 import { errors, ok, parse, requireUser } from '../http.js'
 import { authLimiter } from '../security/rate-limit.js'
@@ -17,6 +17,16 @@ accountRouter.patch('/me/profile', async (req, res) => {
   ok(res, { user: await toPublicUser(user) })
 })
 
+accountRouter.put('/me/analytics-consent', async (req, res) => {
+  const viewer = requireUser(req)
+  const { analytics } = parse(analyticsConsentSchema, req.body)
+  await prisma.user.update({
+    where: { id: viewer.id },
+    data: { analyticsConsent: analytics, analyticsConsentAt: new Date() },
+  })
+  ok(res, { analyticsConsent: analytics })
+})
+
 accountRouter.get('/me/export', async (req, res) => {
   const viewer = requireUser(req)
   const user = await prisma.user.findUniqueOrThrow({
@@ -30,6 +40,8 @@ accountRouter.get('/me/export', async (req, res) => {
       goal: true,
       githubUrl: true,
       privacyAcceptedAt: true,
+      analyticsConsent: true,
+      analyticsConsentAt: true,
       createdAt: true,
       enrollments: { select: { createdAt: true, project: { select: { slug: true } } } },
       lessonProgress: {
@@ -74,6 +86,7 @@ accountRouter.post('/me/delete', authLimiter, async (req, res) => {
         experienceLevel: null,
         weeklyHours: null,
         goal: null,
+        analyticsConsent: false,
         deletedAt: new Date(),
       },
     }),

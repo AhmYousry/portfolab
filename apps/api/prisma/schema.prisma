@@ -63,6 +63,8 @@ model User {
   goal             String?
   githubUrl        String?
   privacyAcceptedAt DateTime
+  analyticsConsent Boolean   @default(false)
+  analyticsConsentAt DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
@@ -252,7 +254,14 @@ model Purchase {
   amountMinor     Int
   currency        String
   createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
   paidAt          DateTime?
+  failedAt        DateTime?
+  refundedAt      DateTime?
+  failureReason   String?
+  intentionId     String?
+  providerTransactionId String?
+  analyticsCapturedAt DateTime?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
   entitlements Entitlement[]

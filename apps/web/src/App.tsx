@@ -19,6 +19,8 @@ function lazyNamed<M extends Record<string, ComponentType>>(load: () => Promise<
 
 const adminPages = () => import('./pages/AdminPages')
 const LessonPage = lazyNamed(() => import('./pages/LessonPage'), 'LessonPage')
+const Checkout = lazyNamed(() => import('./pages/Checkout'), 'Checkout')
+const CheckoutStatus = lazyNamed(() => import('./pages/Checkout'), 'CheckoutStatus')
 const AdminLayout = lazyNamed(adminPages, 'AdminLayout')
 const AdminOverview = lazyNamed(adminPages, 'AdminOverview')
 const AdminProjects = lazyNamed(adminPages, 'AdminProjects')
@@ -93,6 +95,22 @@ export function App() {
               element={
                 <RequireAuth>
                   <Account />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="checkout"
+              element={
+                <RequireAuth>
+                  <Checkout />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="checkout/status"
+              element={
+                <RequireAuth>
+                  <CheckoutStatus />
                 </RequireAuth>
               }
             />

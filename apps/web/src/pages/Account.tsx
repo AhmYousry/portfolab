@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { PublicUser } from '@pb/shared'
 import { Download } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Container } from '../components/Layout'
 import { Button, Card, Field, Notice, PageHeader } from '../components/ui'
 import { api, errorMessage, fieldErrors } from '../lib/api'
-import { useAuthActions, useMe } from '../lib/auth'
+import { syncConsentToServer, useAuthActions, useMe } from '../lib/auth'
+import { getConsent, onConsentChange, setConsent } from '../lib/consent'
 
 interface Purchase {
   id: string
@@ -129,6 +130,52 @@ function ChangePassword() {
   )
 }
 
+function AnalyticsSettings() {
+  const [consent, setLocal] = useState(() => getConsent() ?? { analytics: false, replay: false })
+  const [saved, setSaved] = useState(false)
+  useEffect(() => onConsentChange((c) => setLocal(c ?? { analytics: false, replay: false })), [])
+
+  function update(next: { analytics: boolean; replay: boolean }) {
+    setConsent(next)
+    setSaved(true)
+    void syncConsentToServer()
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-4 text-xl font-bold">التحليلات</h2>
+      <div className="space-y-4 text-sm leading-7">
+        <label className="flex gap-3">
+          <input
+            type="checkbox"
+            className="mt-1.5 size-4 accent-[var(--color-amber)]"
+            checked={consent.analytics}
+            onChange={(e) =>
+              update({ analytics: e.target.checked, replay: e.target.checked && consent.replay })
+            }
+          />
+          <span>تحليلات استخدام مجهولة (PostHog). مش بنبعت إيميل أو اسم أو بيانات دفع.</span>
+        </label>
+        <label className="flex gap-3">
+          <input
+            type="checkbox"
+            className="mt-1.5 size-4 accent-[var(--color-amber)]"
+            checked={consent.replay}
+            disabled={!consent.analytics}
+            onChange={(e) => update({ analytics: consent.analytics, replay: e.target.checked })}
+          />
+          <span>تسجيل الجلسات (session replay) مع إخفاء كل الحقول والكود.</span>
+        </label>
+        {saved && (
+          <p role="status" className="text-ok">
+            اتحفظ.
+          </p>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 function Purchases() {
   const { data } = useQuery({
     queryKey: ['purchases'],
@@ -227,6 +274,7 @@ export function Account() {
       <div className="space-y-6">
         <Profile user={user} />
         <ChangePassword />
+        <AnalyticsSettings />
         <Purchases />
         <Privacy />
       </div>

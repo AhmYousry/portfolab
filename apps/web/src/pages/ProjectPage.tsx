@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, CheckCircle2, Clock, Eye, Lock } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Container } from '../components/Layout'
 import { Badge, Button, Card, ErrorState, Loading, Notice } from '../components/ui'
 import { ApiRequestError, api, errorMessage } from '../lib/api'
+import { analytics } from '../lib/analytics'
 import { useMe } from '../lib/auth'
+import { usePageTitle } from '../lib/seo'
 import { useProject } from '../lib/queries'
 
 export function ProjectPage() {
@@ -22,6 +25,12 @@ export function ProjectPage() {
       navigate(first ? `/projects/${slug}/lessons/${first.slug}` : '/dashboard')
     },
   })
+
+  usePageTitle(project?.title)
+  useEffect(() => {
+    if (project?.tier === 'PRO')
+      analytics.capture('pro_page_viewed', { source: `project:${project.slug}` })
+  }, [project?.tier, project?.slug])
 
   if (isLoading) return <Loading />
   if (isError) {
@@ -68,10 +77,15 @@ export function ProjectPage() {
               المشروع ده لسه بيتبني. هيفضل "قريبًا" لحد ما يبقى كامل ومختبر، ومش متاح للشراء دلوقتي.
             </Notice>
           ) : isPro && !user?.hasPro ? (
-            <Notice>المشروع ده جزء من Portfolio Builder Pro.</Notice>
+            <Notice>المشروع ده جزء من Portfolab Pro.</Notice>
           ) : user ? (
             <>
-              <Button className="w-full" loading={enroll.isPending} onClick={() => enroll.mutate()}>
+              <Button
+                className="w-full"
+                loading={enroll.isPending}
+                onClick={() => enroll.mutate()}
+                data-attr="project-start"
+              >
                 <BookOpen className="size-4" aria-hidden /> ابدأ المشروع
               </Button>
               {enroll.isError && (

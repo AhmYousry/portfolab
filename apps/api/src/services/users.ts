@@ -21,6 +21,7 @@ export async function toPublicUser(user: User): Promise<PublicUser> {
     goal: user.goal,
     githubUrl: user.githubUrl,
     hasPro: await hasActivePro(user.id),
+    analyticsConsent: user.analyticsConsent,
     createdAt: user.createdAt.toISOString(),
   }
 }

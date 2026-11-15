@@ -1,4 +1,4 @@
-# Architecture
+# Architecture — Portfolab
 
 Source of truth: `Ahmed_Claude_Portfolio_Builder_Claude_Code.md`. This document describes what is **actually built**.
 
@@ -72,8 +72,11 @@ Lesson Markdown is rendered with `react-markdown` (raw HTML disabled). Code fenc
 
 ## Analytics
 
-`POST /api/analytics/events` accepts only the allowlisted event names from the spec. Stored: event, anonymous id (random per browser tab session, generated client-side), optional userId for authenticated events, UTM source/medium/campaign/content, path. **No IP address, no user agent, no third-party trackers.** The web client sends events only after the visitor accepts the analytics banner.
+Two layers:
 
-## Payments
+1. **First-party funnel** (`LeadEvent`): allowlisted events, no IP/UA, used for the admin overview. Anonymous page events only after banner consent.
+2. **PostHog** (behavioral analytics): web SDK (`apps/web/src/lib/analytics.ts`) lazy-loaded only after consent; server SDK (`apps/api/src/services/product-analytics.ts`) sends learning/purchase events only for users with `User.analyticsConsent = true`. All properties pass the shared allowlist (`sanitizeProperties`). Details and event catalog: `docs/analytics/posthog-setup.md`.
 
-Not implemented. `Purchase`, `Entitlement` and `WebhookEvent` tables exist so entitlement checks are real and testable. `GET /api/pricing` returns `checkoutEnabled: false`. No checkout routes exist. See `DECISIONS.md` D-008.
+## Payments (Paymob)
+
+`routes/checkout.ts` (session, status, availability) and `routes/webhooks.ts` (mounted before the global JSON parser and CSRF, own 256 kb parser and rate limit). `services/paymob.ts` is the only code that talks to Paymob; `services/payments.ts` owns the purchase state machine (PENDING → PAID | FAILED; PAID → REFUNDED) with conditional updates for idempotency. Entitlements are granted only from an HMAC-verified webhook or an authenticated transaction inquiry. Checkout is closed unless `CHECKOUT_ENABLED`, Paymob configured (test keys unless `PAYMOB_ALLOW_LIVE`), and a Pro project is published. Details: `docs/payments/paymob.md`.

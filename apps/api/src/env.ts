@@ -30,6 +30,28 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  API_PUBLIC_URL: z.url().optional(),
+  POSTHOG_API_KEY: z.string().optional(),
+  POSTHOG_HOST: z.url().default('https://eu.i.posthog.com'),
+  ANALYTICS_RETENTION_DAYS: z.coerce.number().int().min(30).max(1825).default(395),
+  PAYMOB_BASE_URL: z.url().default('https://accept.paymob.com'),
+  PAYMOB_SECRET_KEY: z.string().optional(),
+  PAYMOB_PUBLIC_KEY: z.string().optional(),
+  PAYMOB_HMAC_SECRET: z.string().optional(),
+  PAYMOB_API_KEY: z.string().optional(),
+  PAYMOB_INTEGRATION_IDS: z
+    .string()
+    .optional()
+    .transform((v) =>
+      (v ?? '')
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0),
+    ),
+  PAYMOB_ALLOW_LIVE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 })
 
 const parsed = envSchema.safeParse(process.env)

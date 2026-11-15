@@ -7,9 +7,10 @@ import { Container } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
 import { Badge, ButtonLink, Card, ErrorState, Loading, Notice } from '../components/ui'
 import { ApiRequestError, api, errorMessage } from '../lib/api'
-import { trackEvent } from '../lib/analytics'
+import { analytics, trackEvent } from '../lib/analytics'
 import { useMe } from '../lib/auth'
 import { useLesson } from '../lib/queries'
+import { usePageTitle } from '../lib/seo'
 
 function InlineCode({ text }: { text: string }) {
   return (
@@ -100,6 +101,7 @@ function Checkpoints({
                 checked={c.completed}
                 disabled={!canTrack}
                 onChange={(e) => toggle.mutate({ id: c.id, completed: e.target.checked })}
+                data-attr="checkpoint-toggle"
               />
               <span>
                 <span className="mb-1 block font-semibold">{c.title}</span>
@@ -133,10 +135,15 @@ export function LessonPage() {
   const queryKey = ['lesson', slug, lessonSlug, userKey]
   const qc = useQueryClient()
   const started = useRef<string | null>(null)
+  usePageTitle(lesson?.title)
 
   useEffect(() => {
-    if (!lesson || !user || started.current === lesson.id) return
+    if (!lesson || started.current === lesson.id) return
     started.current = lesson.id
+    if (lesson.progressStatus === null) {
+      analytics.capture('lesson_started', { project_id: slug, lesson_id: lessonSlug })
+    }
+    if (!user) return
     trackEvent('lesson_started')
     if (lesson.progressStatus === null) {
       void api
@@ -232,7 +239,22 @@ export function LessonPage() {
         </h1>
       </header>
 
-      <Markdown source={lesson.contentMarkdown} />
+      <Markdown
+        source={lesson.contentMarkdown}
+        onCodeAction={(action, language) => {
+          const context = { project_id: slug, lesson_id: lessonSlug }
+          if (action === 'reveal') {
+            analytics.capture('feature_used', {
+              feature_name: 'spoiler_revealed',
+              source: lessonSlug,
+            })
+          } else if (language === 'text') {
+            analytics.capture('prompt_copied', { ...context, feature_name: 'lesson_prompt' })
+          } else {
+            analytics.capture('feature_used', { feature_name: 'code_copied', source: lessonSlug })
+          }
+        }}
+      />
 
       <Checkpoints lesson={lesson} canTrack={Boolean(user)} queryKey={queryKey} />
 

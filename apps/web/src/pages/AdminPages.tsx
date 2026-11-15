@@ -72,14 +72,40 @@ export function AdminLayout() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
     <Card className="p-5">
       <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-3xl font-bold">{value.toLocaleString('ar-EG')}</p>
+      <p className="mt-1 text-3xl font-bold" dir="ltr" style={{ textAlign: 'right' }}>
+        {typeof value === 'number' ? value.toLocaleString('ar-EG') : value}
+      </p>
+      {hint && <p className="mt-1 text-xs text-dim">{hint}</p>}
     </Card>
   )
 }
+
+interface OverviewMetrics {
+  totalUsers: number
+  activeLearners: number
+  activeWindowDays: number
+  projectStarts: number
+  projectCompletions: number
+  freeLearners: number
+  convertedFromFree: number
+  freeToProConversion: number | null
+  confirmedPurchases: number
+  refundedPurchases: number
+  revenueMinor: number
+  currency: string
+}
+
+const BLOCKER_LABELS: Record<string, string> = {
+  DISABLED: 'CHECKOUT_ENABLED=false',
+  PROVIDER_NOT_CONFIGURED: 'Paymob مش متظبط',
+  NO_PRO_CONTENT: 'مفيش مشروع Pro منشور',
+}
+const PERCENT = 100
+const MINOR_PER_UNIT = 100
 
 export function AdminOverview() {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -87,26 +113,54 @@ export function AdminOverview() {
     queryFn: () =>
       api.get<{
         totals: Record<string, number>
+        metrics: OverviewMetrics
         funnel: { event: string; count: number }[]
         checkoutEnabled: boolean
+        checkoutBlockers: string[]
+        paymob: { mode: string; configured: boolean; missing: string[]; liveBlocked: boolean }
       }>('/api/admin/overview'),
   })
   if (isLoading) return <Loading />
   if (isError || !data)
     return <ErrorState message="مش قادرين نحمل البيانات." onRetry={() => refetch()} />
-  const t = data.totals
+  const m = data.metrics
+  const conversion =
+    m.freeToProConversion === null ? '—' : `${(m.freeToProConversion * PERCENT).toFixed(1)}%`
   return (
     <div className="space-y-8">
       <Notice>
-        الأرقام دي من الداتابيز الحالية بس. التعليقات على Instagram مش leads مؤكدة، والدفع:{' '}
-        {data.checkoutEnabled ? 'مفعل' : 'متوقف'}.
+        الأرقام دي من سجلات الداتابيز المؤكدة بس (الإيرادات من مدفوعات اتأكدت من Paymob). التحليل
+        التفصيلي للسلوك في PostHog. الدفع: {data.checkoutEnabled ? 'مفعل' : 'متوقف'}
+        {data.checkoutBlockers.length > 0 &&
+          ` (${data.checkoutBlockers.map((b) => BLOCKER_LABELS[b] ?? b).join('، ')})`}
+        . Paymob: {data.paymob.mode}
+        {data.paymob.missing.length > 0 && ` — ناقص: ${data.paymob.missing.join(', ')}`}
+        {data.paymob.liveBlocked && ' — مفاتيح live متوقفة لحد موافقتك'}.
       </Notice>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="مستخدمين" value={t.users ?? 0} />
-        <Stat label="تسجيلات في مشاريع" value={t.enrollments ?? 0} />
-        <Stat label="دروس خلصت" value={t.lessonsCompleted ?? 0} />
-        <Stat label="Checkpoints خلصت" value={t.checkpointsCompleted ?? 0} />
-        <Stat label="مشتريات مدفوعة" value={t.paidPurchases ?? 0} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="إجمالي المستخدمين" value={m.totalUsers} />
+        <Stat
+          label="متعلمين نشطين"
+          value={m.activeLearners}
+          hint={`آخر ${m.activeWindowDays} يوم`}
+        />
+        <Stat label="بدايات مشاريع" value={m.projectStarts} />
+        <Stat label="مشاريع اكتملت" value={m.projectCompletions} />
+        <Stat
+          label="تحويل Free → Pro"
+          value={conversion}
+          hint={`${m.convertedFromFree} من ${m.freeLearners} متعلم مجاني`}
+        />
+        <Stat
+          label="مشتريات مؤكدة"
+          value={m.confirmedPurchases}
+          hint={`${m.refundedPurchases} مستردة`}
+        />
+        <Stat
+          label="الإيرادات المؤكدة"
+          value={`${(m.revenueMinor / MINOR_PER_UNIT).toLocaleString('en-US')} ${m.currency}`}
+        />
+        <Stat label="Checkpoints خلصت" value={data.totals.checkpointsCompleted ?? 0} />
       </div>
       <FunnelTable funnel={data.funnel} />
     </div>
@@ -366,8 +420,11 @@ export function AdminOrders() {
           amountMinor: number
           currency: string
           provider: string
+          failureReason: string | null
         }[]
         activeEntitlements: number
+        checkoutEnabled: boolean
+        checkoutBlockers: string[]
       }>('/api/admin/orders'),
   })
   if (isLoading) return <Loading />
@@ -375,8 +432,9 @@ export function AdminOrders() {
   return (
     <div className="space-y-6">
       <Notice>
-        الدفع مش متفعل. مفيش payment provider متوصل، ومفيش checkout. أي entitlement هنا اتعمل يدويًا
-        للاختبار بس. التفعيل محتاج موافقتك وموافقة الـ provider (DECISIONS.md D-008).
+        {data.checkoutEnabled
+          ? 'الدفع مفعل عن طريق Paymob. الحالات هنا بتتحدث من webhooks متأكد من توقيعها (HMAC) أو من reconciliation.'
+          : `الدفع مش متفعل (${data.checkoutBlockers.map((b) => BLOCKER_LABELS[b] ?? b).join('، ')}). مفيش checkout شغال، والتفعيل الـ live محتاج موافقتك (DECISIONS.md D-008).`}
       </Notice>
       <Card>
         <p className="mb-4">Entitlements نشطة: {data.activeEntitlements}</p>
@@ -387,6 +445,7 @@ export function AdminOrders() {
             {data.purchases.map((p) => (
               <li key={p.id}>
                 {p.provider} · {p.status} · {p.amountMinor / 100} {p.currency}
+                {p.failureReason ? ` · ${p.failureReason}` : ''}
               </li>
             ))}
           </ul>

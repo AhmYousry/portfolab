@@ -1,6 +1,7 @@
 import type { ProgressStatus } from '@prisma/client'
 import { prisma } from '../db.js'
 import { track, trackOnce } from './analytics.js'
+import { captureForUser } from './product-analytics.js'
 
 const publishedLessonsOf = (projectId: string) => ({
   status: 'PUBLISHED' as const,
@@ -18,6 +19,16 @@ export async function ensureEnrollment(userId: string, projectId: string) {
     update: {},
   })
   await track({ event: 'project_enrolled', userId, path: projectId })
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { slug: true, tier: true },
+  })
+  if (project?.tier === 'FREE') {
+    await captureForUser(userId, 'free_project_started', {
+      project_id: project.slug,
+      source: 'enrollment',
+    })
+  }
   return created
 }
 
@@ -38,6 +49,18 @@ export async function setLessonProgress(
   })
   if (!before && status !== 'NOT_STARTED') {
     await track({ event: 'lesson_started', userId, path: lessonId })
+  }
+  if (status === 'COMPLETED' && before?.status !== 'COMPLETED') {
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { slug: true, module: { select: { project: { select: { slug: true } } } } },
+    })
+    if (lesson) {
+      await captureForUser(userId, 'lesson_completed', {
+        project_id: lesson.module.project.slug,
+        lesson_id: lesson.slug,
+      })
+    }
   }
   if (status === 'COMPLETED') await checkProjectCompletion(userId, projectId)
   return progress
@@ -67,8 +90,14 @@ async function checkProjectCompletion(userId: string, projectId: string) {
   const completed = await prisma.lessonProgress.count({
     where: { userId, status: 'COMPLETED', lesson: publishedLessonsOf(projectId) },
   })
-  if (total > 0 && completed === total && project.tier === 'FREE') {
-    await trackOnce({ event: 'free_project_completed', userId, path: project.slug })
+  if (total === 0 || completed !== total) return
+  const event = project.tier === 'FREE' ? 'free_project_completed' : 'pro_project_completed'
+  const first = await trackOnce({ event, userId, path: project.slug })
+  if (first) {
+    await captureForUser(userId, 'project_completed', {
+      project_id: project.slug,
+      plan: project.tier === 'FREE' ? 'free' : 'pro',
+    })
   }
 }
 

@@ -11,6 +11,7 @@ import { useEffect } from 'react'
 import { Container } from '../components/Layout'
 import { ProjectCard } from '../components/ProjectCard'
 import { Badge, ButtonLink, Card, Loading } from '../components/ui'
+import { BRAND } from '@pb/shared'
 import { trackEvent } from '../lib/analytics'
 import { useMe } from '../lib/auth'
 import { useProjects } from '../lib/queries'
@@ -84,7 +85,10 @@ export function Landing() {
         <div className="mesh hero-parallax absolute inset-0 -z-10" aria-hidden />
         <Container className="pb-20 pt-20 sm:pt-28">
           <div className="reveal max-w-4xl">
-            <Badge tone="amber">من سلسلة Ahmed & Claude</Badge>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge tone="amber">{BRAND.name}</Badge>
+              <span className="text-sm text-dim">من صناع سلسلة {BRAND.series}</span>
+            </div>
             <h1 className="display mt-6">
               بطّل تتفرج على tutorials.
               <br />
@@ -92,7 +96,14 @@ export function Landing() {
                 ابدأ تبني.
               </span>
             </h1>
-            <p className="mt-8 max-w-2xl text-lg leading-9 text-muted sm:text-xl">
+            <p
+              dir="ltr"
+              className="mt-6 text-start text-lg font-semibold tracking-tight text-paper/80 sm:text-xl"
+              style={{ textAlign: 'right' }}
+            >
+              {BRAND.tagline}
+            </p>
+            <p className="mt-6 max-w-2xl text-lg leading-9 text-muted sm:text-xl">
               مشاريع Full Stack حقيقية تبنيها خطوة بخطوة، تختبرها، تنشرها، وتشرحها في الإنترفيو. أول
               مشروع كامل <strong className="text-paper">مجاني</strong> ومن غير كارت.
             </p>
@@ -100,6 +111,7 @@ export function Landing() {
               <ButtonLink
                 to={user ? '/dashboard' : '/signup'}
                 onClick={() => trackEvent('free_cta_click', '/')}
+                data-attr="hero-free-cta"
                 className="px-7 py-4 text-base"
               >
                 {user ? 'كمّل من مكانك' : 'ابدأ TaskFlow Lite مجانًا'}

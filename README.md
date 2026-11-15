@@ -1,15 +1,20 @@
-# Ahmed & Claude — Portfolio Builder
+# Portfolab
 
-Arabic-first (RTL) learning platform where junior developers build, test, deploy and explain real full-stack portfolio projects. The free tier ships one complete project (**TaskFlow Lite**); Pro projects are listed as *Coming soon* until they are built and reviewed.
+**Build Real Projects. Prove Your Skills.**
 
-- Product spec (source of truth): [`Ahmed_Claude_Portfolio_Builder_Claude_Code.md`](Ahmed_Claude_Portfolio_Builder_Claude_Code.md)
+Arabic-first (RTL) learning platform where junior developers build, test, deploy and explain real full-stack portfolio projects. The free tier ships one complete project (**TaskFlow Lite**); Pro projects (**Portfolab Pro**) are listed as *Coming soon* until they are built and reviewed. Portfolab is made by the team behind the *Ahmed & Claude* Instagram series.
+
+- Original product spec (written under the working name *Ahmed & Claude — Portfolio Builder*): [`Ahmed_Claude_Portfolio_Builder_Claude_Code.md`](Ahmed_Claude_Portfolio_Builder_Claude_Code.md)
+- Analytics (PostHog): [`docs/analytics/posthog-setup.md`](docs/analytics/posthog-setup.md) · Payments (Paymob): [`docs/payments/paymob.md`](docs/payments/paymob.md)
 - What is built and what is not: [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md)
 - Decisions and open owner questions: [`DECISIONS.md`](DECISIONS.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`docs/roadmap.md`](docs/roadmap.md) · Acceptance criteria: [`docs/acceptance-criteria.md`](docs/acceptance-criteria.md)
 
 ## Stack
 
-pnpm workspaces · TypeScript (strict) · React 19 + Vite 7 + Tailwind 4 · Express 5 · PostgreSQL 16 + Prisma 6 · Zod 4 · Argon2id · Vitest + Supertest · Playwright
+pnpm workspaces · TypeScript (strict) · React 19 + Vite 7 + Tailwind 4 · Express 5 · PostgreSQL 16 + Prisma 6 · Zod 4 · Argon2id · PostHog · Paymob · Vitest + Supertest · Playwright
+
+Internal identifiers (package names `@pb/*`, the root package name, DB/env names) intentionally keep their original names to avoid breaking compatibility.
 
 ```
 apps/api        Express API (auth, content, progress, resources, admin)
@@ -68,9 +73,15 @@ Lessons live in `content/projects/<slug>/<module-key>/*.md` with YAML frontmatte
 
 HttpOnly/SameSite session cookies (Secure in production) with server-side revocation · Argon2id · signed double-submit CSRF + Origin allowlist · rate limits on auth, reset and analytics · Zod on every input · helmet · JSON body limit · no stack traces to clients · paid content and downloads only via authorized API routes · no IP addresses stored for analytics.
 
+## Analytics & payments
+
+- **PostHog** (optional): `cp apps/web/.env.example apps/web/.env.local`, set `VITE_POSTHOG_KEY`; set `POSTHOG_API_KEY` in `apps/api/.env` for server events. Without keys, analytics is a no-op. Nothing loads before the visitor consents. Details: [`docs/analytics/posthog-setup.md`](docs/analytics/posthog-setup.md).
+- **Paymob** (sandbox only): set the `PAYMOB_*`, `API_PUBLIC_URL` and `CHECKOUT_ENABLED` variables in `apps/api/.env`. Checkout stays closed until a Pro project is published. Live keys are refused unless `PAYMOB_ALLOW_LIVE=true`. Details: [`docs/payments/paymob.md`](docs/payments/paymob.md).
+- Maintenance: `pnpm --filter @pb/api payments:reconcile` (stuck pending orders), `pnpm --filter @pb/api analytics:purge` (retention).
+
 ## Not implemented (by design, needs owner approval)
 
-Payments/checkout, real email delivery for password reset, Instagram DM automation, deployment. See `IMPLEMENTATION_STATUS.md`.
+Live payments (Paymob is integrated but sandbox-only and gated), real email delivery for password reset, PostHog project + dashboards (need your account), Instagram DM automation, deployment. See `IMPLEMENTATION_STATUS.md`.
 
 ## Troubleshooting
 

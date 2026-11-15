@@ -33,7 +33,7 @@ export function Login() {
   const [params] = useSearchParams()
   const next = safeNext(params.get('next'))
   const { data: me } = useMe()
-  const { setUser } = useAuthActions()
+  const { signedIn } = useAuthActions()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -41,7 +41,7 @@ export function Login() {
   const login = useMutation({
     mutationFn: () => api.post<{ user: PublicUser }>('/api/auth/login', { email, password }),
     onSuccess: ({ user }) => {
-      setUser(user)
+      signedIn(user, 'login', 'login_page')
       navigate(next, { replace: true })
     },
   })
@@ -55,7 +55,7 @@ export function Login() {
 
   return (
     <AuthShell title="أهلًا تاني" subtitle="كمّل من المكان اللي وقفت فيه.">
-      <form onSubmit={submit} className="space-y-5" noValidate>
+      <form onSubmit={submit} className="space-y-5 ph-no-capture" noValidate>
         <Field
           label="الإيميل"
           type="email"
@@ -99,7 +99,7 @@ export function Signup() {
   const [params] = useSearchParams()
   const next = params.get('next')
   const { data: me } = useMe()
-  const { setUser } = useAuthActions()
+  const { signedIn } = useAuthActions()
   const navigate = useNavigate()
   const [form, setForm] = useState({
     displayName: '',
@@ -113,7 +113,7 @@ export function Signup() {
     mutationFn: () =>
       api.post<{ user: PublicUser }>('/api/auth/signup', { ...form, utm: getUtm() }),
     onSuccess: ({ user }) => {
-      setUser(user)
+      signedIn(user, 'signup', next ? 'signup_with_next' : 'signup_page')
       navigate(`/onboarding?next=${encodeURIComponent(safeNext(next))}`, { replace: true })
     },
   })
@@ -143,7 +143,7 @@ export function Signup() {
 
   return (
     <AuthShell title="ابدأ مجانًا" subtitle="من غير كارت. هنحفظ تقدمك ونفتحلك المشروع كامل.">
-      <form onSubmit={submit} className="space-y-5" noValidate>
+      <form onSubmit={submit} className="space-y-5 ph-no-capture" noValidate>
         <Field
           label="اسمك"
           autoComplete="name"
@@ -228,7 +228,7 @@ export function ForgotPassword() {
             e.preventDefault()
             request.mutate()
           }}
-          className="space-y-5"
+          className="space-y-5 ph-no-capture"
           noValidate
         >
           <Field
@@ -287,7 +287,7 @@ export function ResetPassword() {
             e.preventDefault()
             reset.mutate()
           }}
-          className="space-y-5"
+          className="space-y-5 ph-no-capture"
           noValidate
         >
           <Field

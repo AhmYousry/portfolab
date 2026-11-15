@@ -1,9 +1,12 @@
 import { LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { captureUtm } from '../lib/analytics'
+import { BRAND } from '@pb/shared'
 import { useAuthActions, useMe } from '../lib/auth'
-import { ConsentBanner } from './ConsentBanner'
+import { useAnalyticsRouting } from '../lib/analytics'
+import { useRouteTitle } from '../lib/seo'
+import { BrandWordmark } from './Brand'
+import { ConsentBanner, openConsentSettings } from './ConsentBanner'
 
 const PUBLIC_LINKS = [
   { to: '/curriculum', label: 'المنهج' },
@@ -27,8 +30,10 @@ export function Layout() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
 
+  useAnalyticsRouting(location.pathname, location.search, user)
+  useRouteTitle(location.pathname)
+
   useEffect(() => {
-    captureUtm(location.search)
     setOpen(false)
   }, [location.pathname, location.search])
 
@@ -53,16 +58,8 @@ export function Layout() {
           className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6"
           aria-label="القائمة الرئيسية"
         >
-          <Link to="/" className="flex items-center gap-2 font-bold">
-            <span
-              className="grid size-8 place-items-center rounded-lg bg-amber text-ink"
-              aria-hidden
-            >
-              A
-            </span>
-            <span>
-              Ahmed <span className="text-amber">&</span> Claude
-            </span>
+          <Link to="/" aria-label="Portfolab — الرئيسية" data-attr="nav-logo">
+            <BrandWordmark />
           </Link>
 
           <div className="hidden items-center gap-1 md:flex">
@@ -81,7 +78,7 @@ export function Layout() {
           <div className="hidden items-center gap-2 md:flex">
             {user ? (
               <>
-                <NavLink to="/account" className={navClass}>
+                <NavLink to="/account" className={(s) => `${navClass(s)} ph-no-capture ph-mask`}>
                   {user.displayName}
                 </NavLink>
                 <button
@@ -163,7 +160,16 @@ export function Layout() {
 
       <footer className="border-t border-line/70 py-10 text-sm text-dim">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>Ahmed & Claude — Portfolio Builder. محتوى تعليمي أصلي، ومفيش أي ضمان توظيف.</p>
+          <div className="space-y-1">
+            <p>
+              <span dir="ltr">
+                {BRAND.name} — {BRAND.tagline}
+              </span>
+            </p>
+            <p>
+              محتوى تعليمي أصلي، ومفيش أي ضمان توظيف. من صناع سلسلة {BRAND.series} على Instagram.
+            </p>
+          </div>
           <nav className="flex flex-wrap gap-4" aria-label="روابط قانونية">
             <Link to="/privacy" className="hover:text-paper">
               الخصوصية
@@ -177,6 +183,14 @@ export function Layout() {
             <Link to="/contact" className="hover:text-paper">
               تواصل
             </Link>
+            <button
+              type="button"
+              onClick={openConsentSettings}
+              className="hover:text-paper"
+              data-attr="footer-privacy-settings"
+            >
+              إعدادات التحليلات
+            </button>
           </nav>
         </div>
       </footer>

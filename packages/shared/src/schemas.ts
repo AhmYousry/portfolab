@@ -95,6 +95,22 @@ export const paginationSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+const BILLING_NAME_MAX = 50
+
+export const checkoutSessionSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(BILLING_NAME_MAX),
+    lastName: z.string().trim().min(1).max(BILLING_NAME_MAX),
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(/^\+?[0-9]{10,15}$/, 'رقم الموبايل لازم يكون أرقام بس (10–15 رقم)'),
+    source: z.string().trim().max(40).default('checkout_page'),
+  })
+  .strict()
+
+export const analyticsConsentSchema = z.object({ analytics: z.boolean() }).strict()
+
 export type SignupInput = z.infer<typeof signupSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>

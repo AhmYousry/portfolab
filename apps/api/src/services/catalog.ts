@@ -1,10 +1,13 @@
 import type { Prisma } from '@prisma/client'
-import type { CurriculumModule, PricingTier, ProjectDetail, ProjectSummary } from '@pb/shared'
+import {
+  BRAND,
+  type CurriculumModule,
+  type PricingTier,
+  type ProjectDetail,
+  type ProjectSummary,
+} from '@pb/shared'
 import { prisma } from '../db.js'
-import { env } from '../env.js'
-
-const PRO_TEST_PRICE_MINOR = 24900
-const CHECKOUT_IMPLEMENTED: boolean = false
+import { PRO_PRICE_MINOR, checkoutAvailability } from './payments.js'
 const VISIBLE_PROJECT_STATUSES = ['PUBLISHED', 'COMING_SOON'] as const
 
 const publishedLessonFilter = {
@@ -112,12 +115,13 @@ export async function getPricing(): Promise<PricingTier[]> {
   const free = projects.filter((p) => p.tier === 'FREE')
   const pro = projects.filter((p) => p.tier === 'PRO')
   const proAvailable = pro.some((p) => p.status === 'PUBLISHED')
+  const { enabled: checkoutEnabled } = await checkoutAvailability()
   const strip = ({ slug, title, status }: (typeof projects)[number]) => ({ slug, title, status })
 
   return [
     {
       id: 'FREE',
-      name: 'Portfolio Starter',
+      name: BRAND.starterTier,
       priceMinor: 0,
       currency: 'EGP',
       isTestPrice: false,
@@ -134,12 +138,12 @@ export async function getPricing(): Promise<PricingTier[]> {
     },
     {
       id: 'PRO',
-      name: 'Portfolio Builder Pro',
-      priceMinor: PRO_TEST_PRICE_MINOR,
+      name: BRAND.proTier,
+      priceMinor: PRO_PRICE_MINOR,
       currency: 'EGP',
       isTestPrice: true,
       available: proAvailable,
-      checkoutEnabled: CHECKOUT_IMPLEMENTED && env.CHECKOUT_ENABLED && proAvailable,
+      checkoutEnabled,
       includes: [
         '3 مشاريع أعمق: ExpensePilot، TeamBoard، IssueForge (بتنزل واحد واحد)',
         'Auth، RBAC، multi-tenant authorization، audit logs',

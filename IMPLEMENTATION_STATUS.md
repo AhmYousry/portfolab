@@ -1,70 +1,70 @@
-# Implementation status
+# Implementation status — Portfolab
 
-Last updated: 2026-11-15
+Last updated: 2026-11-15 (Portfolab upgrade: rebrand + PostHog + Paymob)
 
 ## Summary
 
-Phase 0 (plan), Phase 1 (foundation), Phase 2 (Free MVP) and the TaskFlow Lite content are implemented and tested locally. Payments, email delivery, deployment and Instagram automation are **not** implemented and need owner decisions.
+The Free MVP (platform + TaskFlow Lite) is implemented and tested locally. The upgrade added the **Portfolab** brand, **PostHog** product analytics (consent-gated, typed, server + client), and a **Paymob** checkout integration that is complete in code and tested against a mocked Paymob API, but **sandbox-only and closed** until you provide credentials, publish a Pro project, and approve going live.
 
 ## Done
 
 | Area | What exists | Evidence |
 |---|---|---|
 | Monorepo | pnpm workspaces, strict TS, ESLint, Prettier, Docker Compose Postgres, env validation | `pnpm lint`, `pnpm typecheck`, `pnpm format:check` clean |
-| Data model | All spec §7 entities + `PasswordResetToken`; 2 migrations; partial unique index for one active entitlement per user/tier | `apps/api/prisma/` |
-| Auth | Signup/login/logout/me, forgot/reset, change password, Argon2id, DB sessions (hash only), 7-day expiry, revocation, CSRF, Origin check, rate limits | `apps/api/test/auth.test.ts` |
-| Access control | Single access service; anonymous/free/Pro/admin matrix; drafts hidden; pro lessons/resources/progress blocked by guessed IDs | `access.test.ts`, `resources.test.ts` |
-| Learning | Enrollment, lesson reader, checkpoints, auto lesson completion, dashboard, progress page, project-completion event | `progress.test.ts`, E2E |
-| Resources | Authorized downloads only; zips exclude `.env*` (except `.env.example`) and `node_modules`; path-traversal guard; reference solution unlocks after the `crud-endpoints` checkpoints | `resources.test.ts` |
-| Admin | Overview, funnel, content tree with audited status changes + confirm, lesson preview, content import, masked user list, orders (empty), CSV export (aggregate, formula-safe), audit log API | `admin.test.ts`, E2E |
-| Privacy | Analytics opt-in banner, no IP/UA in events, data export, account deletion (anonymize + revoke) | `account.test.ts`, `analytics.test.ts` |
-| Web | RTL Arabic UI: landing, pricing, curriculum, project, lesson (LTR code, spoilers), auth, onboarding, dashboard, progress, resources, account, legal placeholders, admin; mobile nav; code-split | Playwright desktop + mobile |
-| TaskFlow Lite | Reference app (Express 5 + Prisma + Zod + React) with 23 API + 4 UI tests; starter with TODOs and acceptance tests; 6 modules / 12 Arabic lessons / 33 checkpoints; F01–F10 prompts; brief, worksheet, README template, deployment checklist | `examples/taskflow-lite/`, `content/` |
-| Pro prep | ExpensePilot/TeamBoard/IssueForge seeded `COMING_SOON` (outline only); entitlement model + tests; ExpensePilot design doc | `docs/pro/expensepilot.md` |
-| CI | GitHub Actions: lint, format, typecheck, tests (Postgres service), build, Playwright, TaskFlow reference tests | `.github/workflows/ci.yml` (not yet run on GitHub — no remote) |
+| Data model | Spec §7 entities + `PasswordResetToken`; 3 migrations (3rd is additive: purchase lifecycle fields + `User.analyticsConsent`); partial unique index for one active entitlement per user/tier | `apps/api/prisma/` |
+| Auth | Signup/login/logout/me, forgot/reset, change password, Argon2id, DB sessions (hash only), expiry, revocation, CSRF, Origin check, rate limits | `auth.test.ts` |
+| Access control | Anonymous/free/Pro/admin matrix; drafts hidden; Pro lessons/resources/progress blocked by guessed IDs | `access.test.ts`, `resources.test.ts` |
+| Learning | Enrollment, lesson reader, checkpoints, dashboard, progress page | `progress.test.ts`, E2E |
+| Branding | Portfolab name, tagline, logo mark/wordmark, favicon, OG/Twitter meta + 1200×630 PNG, PWA manifest, per-route titles, Portfolab Starter/Pro tiers, branded reset email template, README/docs | E2E branding test |
+| PostHog (web) | Lazy SDK after consent; manual SPA pageviews; scoped autocapture with `data-attr` ids; typed custom events; identify by internal id; reset on logout; UTM + device super properties; URL secret scrubbing; replay double-gated + masked + blocked on sensitive routes; failure-safe | `apps/web/src/lib/analytics.test.ts` (16) |
+| PostHog (api) | `captureForUser` (consent-checked, allowlisted props) for learning and purchase events; no-op without key; flush on shutdown | `payments.test.ts` |
+| Consent | Banner with separate replay opt-in, footer "إعدادات التحليلات", account settings, server sync, privacy page | E2E consent test |
+| Paymob | Intention + Unified Checkout URL; HMAC-SHA512 webhook verification (doc sample vector); idempotent webhook events; amount/currency check; PAID → entitlement + audit; FAILED; REFUNDED → revoke; reconciliation via transaction inquiry (status `?refresh=1` + `payments:reconcile` script); secure logging; live keys refused by default | `payments.test.ts` (24) |
+| Admin | Overview with verified metrics (users, active learners 30d, project starts/completions, free→Pro conversion, confirmed purchases, revenue from PAID records, refunds), checkout/Paymob config status (no secrets), orders with failure reasons | `payments.test.ts` admin case, E2E |
+| Retention | `analytics:purge` removes first-party events and webhook records older than `ANALYTICS_RETENTION_DAYS` (395) | script |
+| TaskFlow Lite | Reference app + starter + 12 Arabic lessons (unchanged by this upgrade) | `examples/taskflow-lite/` |
+| CI | GitHub Actions workflow (not yet run — no remote) | `.github/workflows/ci.yml` |
 
-## Test results (local, 2026-11-15)
+## Test results (local, 2026-11-15, after the upgrade)
 
 | Suite | Result |
 |---|---|
-| Shared schemas (`packages/shared`) | 3 passed |
-| API integration (`apps/api`) | 74 passed |
-| Web unit (`apps/web`) | 7 passed |
-| Playwright E2E (desktop + mobile, local Chrome) | 7 passed |
-| TaskFlow reference server | 23 passed |
-| TaskFlow reference client | 4 passed |
-| TaskFlow starter health test | 1 passed |
+| Shared (`packages/shared`) | 6 passed |
+| API integration (`apps/api`) | 98 passed (74 existing + 24 payments/analytics) |
+| Web unit (`apps/web`) | 23 passed (7 existing + 16 analytics) |
+| Playwright E2E (desktop + mobile, local Chrome) | 10 passed |
 | `pnpm build` (api + web) | passed |
+| Lint / typecheck / format | clean |
 
-## Bugs found by tests and fixed
+## Bugs found and fixed
 
-1. TaskFlow reference: `updateTaskSchema = createTaskSchema.partial()` re-applied Zod defaults, so a PATCH of only `title` reset `status`/`priority`. Fixed; documented in lesson 05 as a teaching moment.
-2. Web: after signup, the "already logged in" redirect beat the onboarding redirect, so onboarding was skipped. Fixed.
-3. Web: checkpoint checkbox waited for the server before flipping. Now optimistic with rollback.
+1. TaskFlow reference: `.partial()` re-applied Zod defaults on PATCH. Fixed (lesson 05 teaches it).
+2. Web: onboarding skipped after signup. Fixed.
+3. Web: checkpoint checkbox waited for the server. Now optimistic with rollback.
+4. **Upgrade:** the committed `pnpm-lock.yaml` still resolved `zod@4.1.12` for `packages/shared` although its `package.json` said `4.6.7` (CI's `--frozen-lockfile` would have failed). Lockfile re-synced.
 
 ## Not done / needs owner input
 
-| Item | Why blocked | Decision ref |
+| Item | Needed from you | Ref |
 |---|---|---|
-| Payments / checkout | Needs provider choice, Egyptian merchant eligibility, webhook verification, policies, explicit approval | D-008 |
-| Email delivery (password reset) | No provider chosen; dev prints link to console; production sends nothing | D-009 |
-| Legal pages | Placeholders marked "draft — owner review"; need legal identity, support email, refund terms | D-015 |
-| Deployment | Hosting provider/budget not chosen | spec Part C |
-| Instagram `BUILD` DM flow | External integration; needs Meta permission verification and approval | spec §13 |
-| Content review | Lessons were written by Claude and are **not human-reviewed**; needs owner/beta-learner review before public launch | spec §11 |
-| Admin manual entitlement grant UI | Not built; entitlements can only be created in DB/tests | backlog |
+| PostHog project + dashboards | Create project, set keys, create the 7 dashboards from `docs/analytics/posthog-setup.md` §5, set retention | D-022 |
+| Paymob sandbox run | Merchant account, test integration IDs, keys, HMAC secret, public `API_PUBLIC_URL`; run the sandbox checklist | `docs/payments/paymob.md` |
+| Live payments | Explicit approval + `PAYMOB_ALLOW_LIVE=true` + a PUBLISHED Pro project + final refund/terms | D-027 |
+| Email delivery | Choose provider (template is ready) | D-009 |
+| Legal pages | Business identity, support email, refund terms, PostHog region/retention values | D-015 |
+| Deployment | Hosting provider/budget | spec Part C |
+| Content review | Human review of lessons | spec §11 |
+| Admin manual entitlement grant UI | Not built | backlog |
 
 ## Known issues / risks
 
-- `npm audit` reports high-severity advisories in the **Prisma CLI's** dependencies (`effect`, `deepmerge-ts` via `@prisma/config`), a dev/build-time tool; no Prisma 6.x fix exists. Runtime `@prisma/client` is unaffected per the advisory paths. Revisit with a Prisma 7 migration.
-- Rate limiting is in-memory (resets on restart, per-instance). Use a shared store if running multiple instances.
-- Fonts include all subsets from `@fontsource`; can be trimmed to Arabic + Latin.
-- Starter's `tasks.test.js` and `TaskForm.test.jsx` fail until the student implements the TODOs (by design).
-- E2E runs against the dev database and leaves `e2e-*@example.test` users behind.
+- PostHog delivery and Paymob calls are verified only against mocks; real-network behavior is unverified until keys exist.
+- Paymob `transaction_inquiry` response shape is not fully documented; validate in sandbox.
+- Prisma CLI dev-dependency advisories (no Prisma 6 fix); in-memory rate limiting; E2E leaves `e2e-*@example.test` users in the dev DB.
 
 ## Next steps (proposed)
 
-1. Owner reviews lessons 01–12 and the landing copy; run 5–10 beta learners through TaskFlow Lite.
-2. Choose hosting + email provider; deploy a private beta.
-3. Push to GitHub to run CI.
-4. Approve starting ExpensePilot (design in `docs/pro/expensepilot.md`).
+1. Provide PostHog keys → verify with the checklist in `docs/analytics/posthog-setup.md` §6.
+2. Provide Paymob **test** credentials + a public API URL (e.g. a tunnel) → run the sandbox checklist.
+3. Review lessons/landing copy; beta-test TaskFlow Lite.
+4. Approve ExpensePilot build; publish it before opening checkout.

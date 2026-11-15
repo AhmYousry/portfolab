@@ -35,7 +35,7 @@ export async function assertLessonReadable(
   if (tier === 'FREE' && lesson.isPreview) return lesson
   if (!viewer) throw errors.unauthorized('سجل دخول مجانًا عشان تكمل الدرس')
   if (!(await canAccessTier(viewer, tier))) {
-    throw errors.forbidden('الدرس ده جزء من Portfolio Builder Pro')
+    throw errors.forbidden('الدرس ده جزء من Portfolab Pro')
   }
   return lesson
 }

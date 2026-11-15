@@ -28,7 +28,7 @@ export function listZipFiles(root: string, dir = root): string[] {
   return files
 }
 const LOCK_REASONS = {
-  TIER: 'متاح في Portfolio Builder Pro',
+  TIER: 'متاح في Portfolab Pro',
   UNLOCK: 'بيتفتح بعد ما تخلص الـ checkpoints بتاعة الدرس المطلوب',
 } as const
 

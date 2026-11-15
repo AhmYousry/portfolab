@@ -1,0 +1,15 @@
+{
+  "name": "Portfolab — Build Real Projects. Prove Your Skills.",
+  "short_name": "Portfolab",
+  "description": "ابني مشاريع Full Stack حقيقية، اختبرها، واشرحها بثقة.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

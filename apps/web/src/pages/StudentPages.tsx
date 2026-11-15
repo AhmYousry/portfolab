@@ -19,7 +19,9 @@ export function Dashboard() {
 
   return (
     <Container>
-      <PageHeader eyebrow="لوحتك" title={`أهلًا يا ${user?.displayName ?? ''}`} />
+      <div className="ph-mask">
+        <PageHeader eyebrow="لوحتك" title={`أهلًا يا ${user?.displayName ?? ''}`} />
+      </div>
       {isLoading && <Loading />}
       {isError && <ErrorState message="مش قادرين نحمل لوحتك." onRetry={() => refetch()} />}
       {data && data.projects.length === 0 && (

@@ -1,5 +1,40 @@
 import { describe, expect, it } from 'vitest'
-import { analyticsEventSchema } from './analytics.js'
+import { analyticsEventSchema, sanitizeProperties, scrubUrl } from './analytics.js'
+import { checkoutSessionSchema } from './schemas.js'
+
+describe('sanitizeProperties', () => {
+  it('keeps only allowlisted keys and drops PII-looking values', () => {
+    expect(
+      sanitizeProperties({
+        project_id: 'taskflow-lite',
+        amount_egp: 249,
+        email: 'a@b.co',
+        source: 'x@y.com',
+        password: 'p',
+        card: '4111111111111111',
+        nested: { a: 1 },
+      }),
+    ).toEqual({ project_id: 'taskflow-lite', amount_egp: 249 })
+  })
+})
+
+describe('scrubUrl', () => {
+  it('redacts secrets in absolute and relative URLs', () => {
+    expect(scrubUrl('/reset-password?token=abc&x=1')).toBe('/reset-password?token=REDACTED&x=1')
+    expect(scrubUrl('https://a.test/p?clientSecret=s&hmac=h')).toBe(
+      'https://a.test/p?clientSecret=REDACTED&hmac=REDACTED',
+    )
+    expect(scrubUrl('/plain')).toBe('/plain')
+  })
+})
+
+describe('checkoutSessionSchema', () => {
+  it('rejects client-supplied price fields', () => {
+    const base = { firstName: 'A', lastName: 'B', phoneNumber: '+201000000000' }
+    expect(checkoutSessionSchema.safeParse(base).success).toBe(true)
+    expect(checkoutSessionSchema.safeParse({ ...base, amount: 1 }).success).toBe(false)
+  })
+})
 import { signupSchema, updateProfileSchema } from './schemas.js'
 
 describe('signupSchema', () => {

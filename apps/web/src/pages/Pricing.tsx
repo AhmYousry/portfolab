@@ -11,7 +11,7 @@ import {
   Notice,
   PageHeader,
 } from '../components/ui'
-import { trackEvent } from '../lib/analytics'
+import { analytics, trackEvent } from '../lib/analytics'
 import { useMe } from '../lib/auth'
 import { usePricing } from '../lib/queries'
 
@@ -23,6 +23,7 @@ export function Pricing() {
 
   useEffect(() => {
     trackEvent('pro_offer_view', '/pricing')
+    analytics.capture('pro_page_viewed', { source: 'pricing' })
   }, [])
 
   return (
@@ -84,8 +85,17 @@ export function Pricing() {
                 to={user ? '/dashboard' : '/signup'}
                 className="w-full"
                 onClick={() => trackEvent('free_cta_click', '/pricing')}
+                data-attr="pricing-free-cta"
               >
                 {user ? 'روح للوحتك' : 'ابدأ مجانًا'}
+              </ButtonLink>
+            ) : tier.checkoutEnabled ? (
+              <ButtonLink
+                to={user ? '/checkout' : `/signup?next=${encodeURIComponent('/checkout')}`}
+                className="w-full"
+                data-attr="pricing-pro-cta"
+              >
+                اشترك في {tier.name}
               </ButtonLink>
             ) : (
               <>

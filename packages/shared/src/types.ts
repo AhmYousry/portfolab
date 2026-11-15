@@ -26,6 +26,7 @@ export interface PublicUser {
   goal: string | null
   githubUrl: string | null
   hasPro: boolean
+  analyticsConsent: boolean
   createdAt: string
 }
 
