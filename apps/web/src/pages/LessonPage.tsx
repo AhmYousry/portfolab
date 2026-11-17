@@ -60,6 +60,14 @@ function Checkpoints({
     onError: (_error, _vars, context) => {
       if (context?.previous) qc.setQueryData(queryKey, context.previous)
     },
+    onSuccess: (_data, { completed }) => {
+      if (completed) {
+        analytics.capture('feature_used', {
+          feature_name: 'checkpoint_completed',
+          source: lesson.id,
+        })
+      }
+    },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey })
       void qc.invalidateQueries({ queryKey: ['dashboard'] })

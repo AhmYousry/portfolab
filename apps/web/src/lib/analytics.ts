@@ -23,7 +23,6 @@ const UTM_MAX = 100
 const MOBILE_MAX_PX = 767
 const TABLET_MAX_PX = 1024
 const QUEUE_MAX = 50
-const REASON_MAX = 200
 const URL_PROPERTIES = [
   '$current_url',
   '$referrer',
@@ -41,12 +40,13 @@ const REPLAY_BLOCKED_PATHS = [
 ]
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
-const POSTHOG_HOST =
-  (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? 'https://eu.i.posthog.com'
+const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST as string | undefined
 const REPLAY_ALLOWED = import.meta.env.VITE_POSTHOG_REPLAY_ENABLED === 'true'
 
 type Loader = () => Promise<PostHog>
 type IdentityUser = Pick<PublicUser, 'id' | 'role' | 'hasPro'>
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+type LogAttributes = Record<string, string | number | boolean>
 let loadPosthog: Loader = () => import('posthog-js').then((m) => m.default)
 let client: PostHog | null = null
 let loading: Promise<PostHog | null> | null = null
@@ -135,6 +135,15 @@ export function posthogConfig(consent: ConsentState): Partial<PostHogConfig> {
     capture_pageview: false,
     capture_pageleave: true,
     respect_dnt: true,
+    logs: {
+      serviceName: 'portfolab-web',
+      environment: import.meta.env.MODE,
+    },
+    capture_exceptions: {
+      capture_unhandled_errors: true,
+      capture_unhandled_rejections: true,
+      capture_console_errors: false,
+    },
     autocapture: {
       dom_event_allowlist: ['click', 'submit', 'change'],
       element_allowlist: ['a', 'button', 'form', 'select', 'label'],
@@ -168,7 +177,7 @@ function syncReplay(ph: PostHog, pathname: string) {
 
 async function ensureClient(): Promise<PostHog | null> {
   if (client) return client
-  if (!POSTHOG_KEY || !currentConsent?.analytics) return null
+  if (!POSTHOG_KEY || !POSTHOG_HOST || !currentConsent?.analytics) return null
   loading ??= loadPosthog()
     .then((ph) => {
       if (!currentConsent?.analytics) return null
@@ -177,6 +186,7 @@ async function ensureClient(): Promise<PostHog | null> {
       ph.register(superProperties())
       syncReplay(ph, window.location.pathname)
       client = ph
+      safely(() => sendLog(ph, 'info', 'web_client_initialized', { analytics_consent: true }))
       for (const fn of queue.splice(0)) safely(() => fn(ph))
       return ph
     })
@@ -192,6 +202,23 @@ function withClient(fn: (ph: PostHog) => void) {
   if (client) return safely(() => fn(client as PostHog))
   if (queue.length < QUEUE_MAX) queue.push(fn)
   void ensureClient()
+}
+
+function sendLog(ph: PostHog, level: LogLevel, message: string, attributes: LogAttributes) {
+  switch (level) {
+    case 'debug':
+      ph.logger.debug(message, attributes)
+      break
+    case 'info':
+      ph.logger.info(message, attributes)
+      break
+    case 'warn':
+      ph.logger.warn(message, attributes)
+      break
+    case 'error':
+      ph.logger.error(message, attributes)
+      break
+  }
 }
 
 function sendIdentify(ph: PostHog) {
@@ -246,18 +273,32 @@ function applyConsent(state: ConsentState | null) {
 }
 
 export function initAnalytics() {
+  if (import.meta.env.DEV && !POSTHOG_KEY) {
+    console.error(
+      new Error(
+        'VITE_POSTHOG_KEY variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once VITE_POSTHOG_KEY is configured',
+      ),
+    )
+  }
+  if (import.meta.env.DEV && !POSTHOG_HOST) {
+    console.error(
+      new Error(
+        'VITE_POSTHOG_HOST variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once VITE_POSTHOG_HOST is configured',
+      ),
+    )
+  }
   applyConsent(getConsent())
   onConsentChange(applyConsent)
-  window.addEventListener('error', (e) => captureError(e.message, 'window_error'))
-  window.addEventListener('unhandledrejection', () =>
-    captureError('unhandled_rejection', 'promise'),
-  )
 }
 
 export const analytics = {
   capture<K extends ProductEventName>(event: K, properties: ProductEventMap[K]) {
     const props = sanitizeProperties({ ...properties, device_type: deviceType() })
     withClient((ph) => ph.capture(event, props))
+  },
+
+  log(level: LogLevel, message: string, attributes: LogAttributes = {}) {
+    withClient((ph) => sendLog(ph, level, message, attributes))
   },
 
   pageview(pathname: string, search: string) {
@@ -292,13 +333,6 @@ export const analytics = {
 
 export function isReplayBlocked(pathname: string): boolean {
   return REPLAY_BLOCKED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-}
-
-export function captureError(reason: string, featureName?: string) {
-  analytics.capture('client_error', {
-    reason: reason.slice(0, REASON_MAX),
-    feature_name: featureName,
-  })
 }
 
 function anonymousId(): string {

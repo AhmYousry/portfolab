@@ -14,6 +14,7 @@
     "@fontsource/ibm-plex-sans-arabic": "5.2.8",
     "@fontsource/jetbrains-mono": "5.2.8",
     "@pb/shared": "workspace:*",
+    "@posthog/react": "1",
     "@tanstack/react-query": "5.90.7",
     "lucide-react": "0.553.0",
     "posthog-js": "1.438.21",

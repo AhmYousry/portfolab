@@ -120,6 +120,9 @@ importers:
       '@pb/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@posthog/react':
+        specifier: '1'
+        version: 1.11.3(@types/react@19.2.2)(posthog-js@1.438.21(@types/react@19.2.2)(react@19.2.0))(react@19.2.0)
       '@tanstack/react-query':
         specifier: 5.90.7
         version: 5.90.7(react@19.2.0)
@@ -692,6 +695,16 @@ packages:
 
   '@posthog/core@1.68.0':
     resolution: {integrity: sha512-5kjPcLquzj47qBGn52+7RRXrJJvrTHaRKgxV9izYPFzoVFEftFqSXYZF/ug+yialxDU73dR9apyi+mSaAeaXPw==}
+
+  '@posthog/react@1.11.3':
+    resolution: {integrity: sha512-YqvZb2y9jh/yW0ojUtAns0l4yHWqpu+5UeIBxZlXpyGuWlh8M4siXRMtqhEh1BKfqp6Sq2usdsQCuoUzx1QFWQ==}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      posthog-js: '>=1.257.2'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@posthog/types@1.425.1':
     resolution: {integrity: sha512-mh7jyQ5lN+XCeOnMdYkBEFtO/G0TxeLOKTWNH6E6OZjxS4nVM0Tb2xQt+FG5DCFM9qzL2HmuX6A793TwlJVDvw==}
@@ -3823,6 +3836,13 @@ snapshots:
   '@posthog/core@1.68.0':
     dependencies:
       '@posthog/types': 1.425.1
+
+  '@posthog/react@1.11.3(@types/react@19.2.2)(posthog-js@1.438.21(@types/react@19.2.2)(react@19.2.0))(react@19.2.0)':
+    dependencies:
+      posthog-js: 1.438.21(@types/react@19.2.2)(react@19.2.0)
+      react: 19.2.0
+    optionalDependencies:
+      '@types/react': 19.2.2
 
   '@posthog/types@1.425.1': {}
 
