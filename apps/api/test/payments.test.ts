@@ -19,8 +19,10 @@ interface Captured {
   distinctId: string
   event: string
   properties: Record<string, string | number | boolean>
+  set?: Record<string, string | number | boolean>
 }
 const captured: Captured[] = []
+let flushes = 0
 const fetchCalls: { url: string; init: RequestInit }[] = []
 let intentionOk = true
 let intentionCounter = 0
@@ -49,8 +51,11 @@ beforeAll(async () => {
     PAYMOB_ALLOW_LIVE: false,
   })
   setAnalyticsSink({
-    capture: (distinctId, event, properties) =>
-      void captured.push({ distinctId, event, properties }),
+    capture: (distinctId, event, properties, set) =>
+      void captured.push({ distinctId, event, properties, set }),
+    flush: async () => {
+      flushes += 1
+    },
     shutdown: async () => undefined,
   })
   setPaymobFetch(async (input, init) => {
@@ -368,6 +373,44 @@ describe('Paymob webhook', () => {
     expect((await prisma.purchase.findUniqueOrThrow({ where: { id: purchaseId } })).status).toBe(
       'PENDING',
     )
+  })
+
+  it('purchase_completed sets plan=pro and is flushed immediately', async () => {
+    const { purchaseId, userId } = await startCheckout()
+    flushes = 0
+    await postWebhook(transaction(purchaseId))
+    const event = captured.find((c) => c.distinctId === userId && c.event === 'purchase_completed')
+    expect(event?.set).toEqual({ plan: 'pro' })
+    expect(flushes).toBeGreaterThanOrEqual(1)
+  })
+
+  it('purchase_refunded fires once (M-5), resets plan, and is flushed', async () => {
+    const { purchaseId, userId } = await startCheckout()
+    const paid = transaction(purchaseId)
+    await postWebhook(paid)
+    captured.length = 0
+    flushes = 0
+
+    await postWebhook({ ...paid, is_refunded: true })
+    await postWebhook(transaction(purchaseId, { is_refund: true, has_parent_transaction: true }))
+    await postWebhook({ ...paid, is_refunded: true, is_voided: true })
+
+    const refunds = captured.filter(
+      (c) => c.distinctId === userId && c.event === 'purchase_refunded',
+    )
+    expect(refunds).toHaveLength(1)
+    expect(refunds[0]).toMatchObject({
+      properties: {
+        plan: 'pro',
+        amount_egp: 249,
+        currency: 'EGP',
+        provider: 'paymob',
+        purchase_id: purchaseId,
+      },
+      set: { plan: 'free' },
+    })
+    expect(flushes).toBeGreaterThanOrEqual(1)
+    expect(JSON.stringify(refunds)).not.toMatch(/@example\.test|2346|MasterCard/)
   })
 
   it('refund revokes Pro access', async () => {

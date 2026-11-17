@@ -88,7 +88,7 @@ checkpoints:
 
 استخدم الـ prompt ده مع أي AI assistant. لاحظ إنه بيطلب أسئلة الأول ومش بيطلب كود:
 
-```text
+```text prompt=F01
 Act as a senior full-stack mentor. I know basic JavaScript. Help me scope TaskFlow Lite into a buildable MVP. Ask up to 5 clarifying questions, then give user stories, out-of-scope features, and an acceptance checklist. Don't write the app for me.
 ```
 

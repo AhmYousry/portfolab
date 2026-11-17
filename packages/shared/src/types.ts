@@ -104,6 +104,7 @@ export interface PricingTier {
 
 export interface ResourceView {
   id: string
+  key: string
   title: string
   description: string
   type: string

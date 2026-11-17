@@ -3,28 +3,34 @@ import { type ProductEventMap, type ProductEventName, sanitizeProperties } from 
 import { prisma } from '../db.js'
 import { env } from '../env.js'
 
+type SafeProps = Record<string, string | number | boolean>
+
 export interface AnalyticsSink {
-  capture(
-    distinctId: string,
-    event: string,
-    properties: Record<string, string | number | boolean>,
-  ): void
+  capture(distinctId: string, event: string, properties: SafeProps, set?: SafeProps): void
+  flush?(): Promise<void>
   shutdown(): Promise<void>
 }
+
+const FLUSH_AT = 20
+const FLUSH_INTERVAL_MS = 10_000
 
 class PostHogSink implements AnalyticsSink {
   private readonly client: PostHog
 
   constructor(apiKey: string, host: string) {
-    this.client = new PostHog(apiKey, { host, flushAt: 20, flushInterval: 10_000 })
+    this.client = new PostHog(apiKey, { host, flushAt: FLUSH_AT, flushInterval: FLUSH_INTERVAL_MS })
   }
 
-  capture(
-    distinctId: string,
-    event: string,
-    properties: Record<string, string | number | boolean>,
-  ) {
-    this.client.capture({ distinctId, event, properties: { ...properties, app: 'api' } })
+  capture(distinctId: string, event: string, properties: SafeProps, set?: SafeProps) {
+    this.client.capture({
+      distinctId,
+      event,
+      properties: { ...properties, app: 'api', ...(set ? { $set: set } : {}) },
+    })
+  }
+
+  async flush() {
+    await this.client.flush()
   }
 
   async shutdown() {
@@ -49,10 +55,17 @@ export async function shutdownAnalytics() {
   await sink.shutdown().catch(() => undefined)
 }
 
+export interface CaptureOptions {
+  setPersonProperties?: Record<string, unknown>
+  // Revenue-relevant events are flushed immediately instead of waiting for the batch.
+  flush?: boolean
+}
+
 export async function captureForUser<K extends ProductEventName>(
   userId: string,
   event: K,
   properties: ProductEventMap[K],
+  options: CaptureOptions = {},
 ): Promise<boolean> {
   try {
     const user = await prisma.user.findUnique({
@@ -60,7 +73,11 @@ export async function captureForUser<K extends ProductEventName>(
       select: { analyticsConsent: true, deletedAt: true },
     })
     if (!user?.analyticsConsent || user.deletedAt) return false
-    sink.capture(userId, event, sanitizeProperties(properties as Record<string, unknown>))
+    const set = options.setPersonProperties
+      ? sanitizeProperties(options.setPersonProperties)
+      : undefined
+    sink.capture(userId, event, sanitizeProperties(properties as Record<string, unknown>), set)
+    if (options.flush) await sink.flush?.().catch(() => undefined)
     return true
   } catch {
     return false

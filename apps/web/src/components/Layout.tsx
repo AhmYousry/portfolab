@@ -1,26 +1,43 @@
 import { LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { BRAND } from '@pb/shared'
-import { useAuthActions, useMe } from '../lib/auth'
-import { useAnalyticsRouting } from '../lib/analytics'
+import { type AnalyticsId, BRAND } from '@pb/shared'
+import { useAuthActions, useConsentServerSync, useMe } from '../lib/auth'
+import { trackClick, useAnalyticsRouting } from '../lib/analytics'
 import { useRouteTitle } from '../lib/seo'
 import { BrandWordmark } from './Brand'
 import { ConsentBanner, openConsentSettings } from './ConsentBanner'
 
-const PUBLIC_LINKS = [
-  { to: '/curriculum', label: 'المنهج' },
-  { to: '/pricing', label: 'الأسعار' },
+interface NavItem {
+  to: string
+  label: string
+  id: AnalyticsId
+}
+
+const PUBLIC_LINKS: NavItem[] = [
+  { to: '/curriculum', label: 'المنهج', id: 'nav-curriculum' },
+  { to: '/pricing', label: 'الأسعار', id: 'nav-pricing' },
 ]
 
-const STUDENT_LINKS = [
-  { to: '/dashboard', label: 'لوحتي' },
-  { to: '/progress', label: 'التقدم' },
-  { to: '/resources', label: 'الملفات' },
+const STUDENT_LINKS: NavItem[] = [
+  { to: '/dashboard', label: 'لوحتي', id: 'nav-dashboard' },
+  { to: '/progress', label: 'التقدم', id: 'nav-progress' },
+  { to: '/resources', label: 'الملفات', id: 'nav-resources' },
+]
+
+const FOOTER_LINKS: NavItem[] = [
+  { to: '/privacy', label: 'الخصوصية', id: 'footer-privacy' },
+  { to: '/terms', label: 'الشروط', id: 'footer-terms' },
+  { to: '/refund-policy', label: 'الاسترجاع', id: 'footer-refund' },
+  { to: '/contact', label: 'تواصل', id: 'footer-contact' },
 ]
 
 function navClass({ isActive }: { isActive: boolean }) {
   return `rounded-lg px-3 py-2 text-sm transition ${isActive ? 'text-paper bg-white/5' : 'text-muted hover:text-paper'}`
+}
+
+function tracked(id: AnalyticsId) {
+  return { 'data-analytics-id': id, onClick: () => trackClick(id) }
 }
 
 export function Layout() {
@@ -31,6 +48,7 @@ export function Layout() {
   const [open, setOpen] = useState(false)
 
   useAnalyticsRouting(location.pathname, location.search, user)
+  useConsentServerSync(user)
   useRouteTitle(location.pathname)
 
   useEffect(() => {
@@ -40,8 +58,11 @@ export function Layout() {
   const links = [...PUBLIC_LINKS, ...(user ? STUDENT_LINKS : [])]
 
   async function handleLogout() {
+    trackClick('nav-logout')
+    // Leave protected pages first; clearing the user there would trigger the auth guard's
+    // redirect to /login?next=… before we could navigate home.
+    navigate('/', { replace: true })
     await logout()
-    navigate('/')
   }
 
   return (
@@ -58,18 +79,18 @@ export function Layout() {
           className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6"
           aria-label="القائمة الرئيسية"
         >
-          <Link to="/" aria-label="Portfolab — الرئيسية" data-attr="nav-logo">
+          <Link to="/" aria-label="Portfolab — الرئيسية" {...tracked('nav-logo')}>
             <BrandWordmark />
           </Link>
 
           <div className="hidden items-center gap-1 md:flex">
             {links.map((l) => (
-              <NavLink key={l.to} to={l.to} className={navClass}>
+              <NavLink key={l.to} to={l.to} className={navClass} {...tracked(l.id)}>
                 {l.label}
               </NavLink>
             ))}
             {user?.role === 'ADMIN' && (
-              <NavLink to="/admin" className={navClass}>
+              <NavLink to="/admin" className={navClass} {...tracked('nav-admin')}>
                 Admin
               </NavLink>
             )}
@@ -78,25 +99,31 @@ export function Layout() {
           <div className="hidden items-center gap-2 md:flex">
             {user ? (
               <>
-                <NavLink to="/account" className={(s) => `${navClass(s)} ph-no-capture ph-mask`}>
+                <NavLink
+                  to="/account"
+                  className={(s) => `${navClass(s)} ph-no-capture ph-mask`}
+                  {...tracked('nav-account')}
+                >
                   {user.displayName}
                 </NavLink>
                 <button
                   onClick={handleLogout}
                   className="rounded-lg p-2 text-muted hover:text-paper"
                   aria-label="تسجيل الخروج"
+                  data-analytics-id="nav-logout"
                 >
                   <LogOut className="size-4" aria-hidden />
                 </button>
               </>
             ) : (
               <>
-                <NavLink to="/login" className={navClass}>
+                <NavLink to="/login" className={navClass} {...tracked('nav-login')}>
                   دخول
                 </NavLink>
                 <Link
                   to="/signup"
                   className="rounded-xl bg-amber px-4 py-2 text-sm font-semibold text-ink hover:bg-amber-2"
+                  {...tracked('nav-signup')}
                 >
                   ابدأ مجانًا
                 </Link>
@@ -106,10 +133,14 @@ export function Layout() {
 
           <button
             className="rounded-lg p-2 md:hidden"
-            onClick={() => setOpen((v) => !v)}
+            onClick={() => {
+              if (!open) trackClick('nav-menu-toggle')
+              setOpen((v) => !v)
+            }}
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label={open ? 'اقفل القائمة' : 'افتح القائمة'}
+            data-analytics-id="nav-menu-toggle"
           >
             {open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
           </button>
@@ -118,33 +149,34 @@ export function Layout() {
           <div id="mobile-nav" className="border-t border-line px-4 pb-4 md:hidden">
             <div className="flex flex-col gap-1 pt-3">
               {links.map((l) => (
-                <NavLink key={l.to} to={l.to} className={navClass}>
+                <NavLink key={l.to} to={l.to} className={navClass} {...tracked(l.id)}>
                   {l.label}
                 </NavLink>
               ))}
               {user?.role === 'ADMIN' && (
-                <NavLink to="/admin" className={navClass}>
+                <NavLink to="/admin" className={navClass} {...tracked('nav-admin')}>
                   Admin
                 </NavLink>
               )}
               {user ? (
                 <>
-                  <NavLink to="/account" className={navClass}>
+                  <NavLink to="/account" className={navClass} {...tracked('nav-account')}>
                     حسابي
                   </NavLink>
                   <button
                     onClick={handleLogout}
                     className="rounded-lg px-3 py-2 text-start text-sm text-muted"
+                    data-analytics-id="nav-logout"
                   >
                     تسجيل الخروج
                   </button>
                 </>
               ) : (
                 <>
-                  <NavLink to="/login" className={navClass}>
+                  <NavLink to="/login" className={navClass} {...tracked('nav-login')}>
                     دخول
                   </NavLink>
-                  <NavLink to="/signup" className={navClass}>
+                  <NavLink to="/signup" className={navClass} {...tracked('nav-signup')}>
                     ابدأ مجانًا
                   </NavLink>
                 </>
@@ -171,23 +203,19 @@ export function Layout() {
             </p>
           </div>
           <nav className="flex flex-wrap gap-4" aria-label="روابط قانونية">
-            <Link to="/privacy" className="hover:text-paper">
-              الخصوصية
-            </Link>
-            <Link to="/terms" className="hover:text-paper">
-              الشروط
-            </Link>
-            <Link to="/refund-policy" className="hover:text-paper">
-              الاسترجاع
-            </Link>
-            <Link to="/contact" className="hover:text-paper">
-              تواصل
-            </Link>
+            {FOOTER_LINKS.map((l) => (
+              <Link key={l.to} to={l.to} className="hover:text-paper" {...tracked(l.id)}>
+                {l.label}
+              </Link>
+            ))}
             <button
               type="button"
-              onClick={openConsentSettings}
+              onClick={() => {
+                trackClick('footer-privacy-settings')
+                openConsentSettings()
+              }}
               className="hover:text-paper"
-              data-attr="footer-privacy-settings"
+              data-analytics-id="footer-privacy-settings"
             >
               إعدادات التحليلات
             </button>

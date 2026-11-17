@@ -1,10 +1,12 @@
 import type { PostHog, PostHogConfig } from 'posthog-js'
 import {
+  type AnalyticsId,
   CLIENT_ANALYTICS_EVENTS,
   type ProductEventMap,
   type ProductEventName,
   type PublicUser,
   type Utm,
+  sanitizeErrorText,
   sanitizeProperties,
   scrubUrl,
 } from '@pb/shared'
@@ -23,6 +25,10 @@ const UTM_MAX = 100
 const MOBILE_MAX_PX = 767
 const TABLET_MAX_PX = 1024
 const QUEUE_MAX = 50
+const PENDING_PAGE_EVENTS_MAX = 5
+// View-type events that describe the page itself. If the visitor has not decided on consent yet,
+// they are held in memory (never sent) and replayed once only if consent is granted on that page.
+const PAGE_SCOPED_EVENTS = new Set<ProductEventName>(['pro_page_viewed', 'lesson_previewed'])
 const REASON_MAX = 200
 const URL_PROPERTIES = [
   '$current_url',
@@ -38,6 +44,8 @@ const REPLAY_BLOCKED_PATHS = [
   '/reset-password',
   '/account',
   '/checkout',
+  '/onboarding',
+  '/admin',
 ]
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
@@ -55,6 +63,11 @@ let currentUser: IdentityUser | null = null
 let identifiedId: string | null = null
 let lastRoute: { pathname: string; search: string } | null = null
 let pageviewSentFor: string | null = null
+let pendingPageEvents: {
+  pathname: string
+  event: string
+  props: Record<string, string | number | boolean>
+}[] = []
 const queue: Array<(ph: PostHog) => void> = []
 
 function safeGet(storage: Storage, key: string): string | null {
@@ -137,8 +150,16 @@ export function posthogConfig(consent: ConsentState): Partial<PostHogConfig> {
     respect_dnt: true,
     autocapture: {
       dom_event_allowlist: ['click', 'submit', 'change'],
-      element_allowlist: ['a', 'button', 'form', 'select', 'label'],
-      css_selector_allowlist: ['[data-attr]', 'a', 'button', 'form'],
+      element_allowlist: ['a', 'button', 'form', 'select', 'label', 'input'],
+      css_selector_allowlist: [
+        '[data-analytics-id]',
+        'a',
+        'button',
+        'form',
+        'select',
+        'label',
+        'input[type="checkbox"]',
+      ],
     },
     mask_all_element_attributes: false,
     mask_all_text: false,
@@ -194,13 +215,24 @@ function withClient(fn: (ph: PostHog) => void) {
   void ensureClient()
 }
 
+function identityKey(user: IdentityUser) {
+  return `${user.id}:${user.hasPro ? 'pro' : 'free'}`
+}
+
 function sendIdentify(ph: PostHog) {
-  if (!currentUser || identifiedId === currentUser.id) return
+  if (!currentUser || identifiedId === identityKey(currentUser)) return
+  const utm = getUtm()
   ph.identify(
     currentUser.id,
     sanitizeProperties({ role: currentUser.role, plan: currentUser.hasPro ? 'pro' : 'free' }),
+    sanitizeProperties({
+      initial_utm_source: utm?.source,
+      initial_utm_medium: utm?.medium,
+      initial_utm_campaign: utm?.campaign,
+      initial_utm_content: utm?.content,
+    }),
   )
-  identifiedId = currentUser.id
+  identifiedId = identityKey(currentUser)
 }
 
 function sendPageview(ph: PostHog, pathname: string, search: string) {
@@ -215,6 +247,11 @@ function onConsentGranted() {
   withClient((ph) => {
     sendIdentify(ph)
     if (lastRoute) sendPageview(ph, lastRoute.pathname, lastRoute.search)
+    const here = window.location.pathname
+    for (const pending of pendingPageEvents) {
+      if (pending.pathname === here) ph.capture(pending.event, pending.props)
+    }
+    pendingPageEvents = []
   })
 }
 
@@ -223,6 +260,7 @@ function applyConsent(state: ConsentState | null) {
   currentConsent = state
   if (!state?.analytics) {
     queue.length = 0
+    pendingPageEvents = []
     identifiedId = null
     pageviewSentFor = null
     if (client) {
@@ -257,10 +295,20 @@ export function initAnalytics() {
 export const analytics = {
   capture<K extends ProductEventName>(event: K, properties: ProductEventMap[K]) {
     const props = sanitizeProperties({ ...properties, device_type: deviceType() })
+    const undecided = currentConsent === null
+    if (undecided && PAGE_SCOPED_EVENTS.has(event)) {
+      if (pendingPageEvents.length < PENDING_PAGE_EVENTS_MAX) {
+        pendingPageEvents.push({ pathname: window.location.pathname, event, props })
+      }
+      return
+    }
     withClient((ph) => ph.capture(event, props))
   },
 
   pageview(pathname: string, search: string) {
+    if (lastRoute?.pathname !== pathname) {
+      pendingPageEvents = pendingPageEvents.filter((e) => e.pathname === pathname)
+    }
     lastRoute = { pathname, search }
     withClient((ph) => sendPageview(ph, pathname, search))
   },
@@ -290,13 +338,26 @@ export const analytics = {
   },
 }
 
+export type ClickProps = Pick<
+  ProductEventMap['button_clicked'],
+  'resource_id' | 'project_id' | 'lesson_id'
+>
+
+export function trackClick(analyticsId: AnalyticsId, props: ClickProps = {}) {
+  analytics.capture('button_clicked', {
+    analytics_id: analyticsId,
+    path: scrubUrl(window.location.pathname),
+    ...props,
+  })
+}
+
 export function isReplayBlocked(pathname: string): boolean {
   return REPLAY_BLOCKED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
 export function captureError(reason: string, featureName?: string) {
   analytics.capture('client_error', {
-    reason: reason.slice(0, REASON_MAX),
+    reason: sanitizeErrorText(reason).slice(0, REASON_MAX),
     feature_name: featureName,
   })
 }
@@ -350,5 +411,6 @@ export function __setPosthogLoaderForTests(loader: Loader) {
   identifiedId = null
   lastRoute = null
   pageviewSentFor = null
+  pendingPageEvents = []
   queue.length = 0
 }

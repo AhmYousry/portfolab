@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { safeNext } from './Guards'
 import { Markdown } from './Markdown'
 
@@ -38,6 +38,34 @@ describe('Markdown', () => {
   it('does not render raw HTML from content', () => {
     const { container } = render(<Markdown source={SOURCE} />)
     expect(container.querySelector('script')).toBeNull()
+  })
+})
+
+describe('prompt ids', () => {
+  it('parses prompt ids from the fence meta', async () => {
+    const { promptIdFromMeta } = await import('./Markdown')
+    expect(promptIdFromMeta('prompt=F07')).toBe('F07')
+    expect(promptIdFromMeta('spoiler prompt=F10')).toBe('F10')
+    expect(promptIdFromMeta('spoiler')).toBeUndefined()
+  })
+
+  it('copy on a prompt block reports its id; a plain text block has none', async () => {
+    const { Markdown } = await import('./Markdown')
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    const onCodeAction = vi.fn()
+    render(
+      <Markdown
+        source={'```text prompt=F03\nDesign my model\n```\n\n```text\n[ diagram ]\n```'}
+        onCodeAction={onCodeAction}
+      />,
+    )
+    const copyButtons = screen.getAllByRole('button', { name: /نسخ/ })
+    await userEvent.click(copyButtons[0] as HTMLElement)
+    await userEvent.click(copyButtons[1] as HTMLElement)
+    expect(onCodeAction.mock.calls).toEqual([
+      ['copy', { language: 'text', promptId: 'F03' }],
+      ['copy', { language: 'text', promptId: undefined }],
+    ])
   })
 })
 

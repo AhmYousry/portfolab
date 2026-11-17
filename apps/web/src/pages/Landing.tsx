@@ -111,7 +111,7 @@ export function Landing() {
               <ButtonLink
                 to={user ? '/dashboard' : '/signup'}
                 onClick={() => trackEvent('free_cta_click', '/')}
-                data-attr="hero-free-cta"
+                analyticsId="hero-free-cta"
                 className="px-7 py-4 text-base"
               >
                 {user ? 'كمّل من مكانك' : 'ابدأ TaskFlow Lite مجانًا'}
@@ -120,6 +120,8 @@ export function Landing() {
               <ButtonLink
                 to="/projects/taskflow-lite/lessons/why-taskflow"
                 variant="ghost"
+                analyticsId="hero-preview-lesson"
+                analyticsProps={{ project_id: 'taskflow-lite', lesson_id: 'why-taskflow' }}
                 className="px-7 py-4 text-base"
               >
                 اقرا أول درس من غير حساب
@@ -163,7 +165,12 @@ export function Landing() {
       <Container>
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <h2 className="text-3xl font-bold">المشاريع</h2>
-          <ButtonLink to="/curriculum" variant="quiet" className="px-0">
+          <ButtonLink
+            to="/curriculum"
+            variant="quiet"
+            className="px-0"
+            analyticsId="landing-curriculum-link"
+          >
             شوف المنهج كامل <ArrowLeft className="size-4" aria-hidden />
           </ButtonLink>
         </div>

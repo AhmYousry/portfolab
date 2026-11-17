@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, CheckCircle2, Clock, Eye, Lock } from 'lucide-react'
 import { useEffect } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { Container } from '../components/Layout'
-import { Badge, Button, Card, ErrorState, Loading, Notice } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Loading, Notice, TrackedLink } from '../components/ui'
 import { ApiRequestError, api, errorMessage } from '../lib/api'
 import { analytics } from '../lib/analytics'
 import { useMe } from '../lib/auth'
@@ -84,7 +84,8 @@ export function ProjectPage() {
                 className="w-full"
                 loading={enroll.isPending}
                 onClick={() => enroll.mutate()}
-                data-attr="project-start"
+                analyticsId="project-start"
+                analyticsProps={{ project_id: slug }}
               >
                 <BookOpen className="size-4" aria-hidden /> ابدأ المشروع
               </Button>
@@ -95,12 +96,14 @@ export function ProjectPage() {
               )}
             </>
           ) : (
-            <Link
+            <TrackedLink
               to={`/signup?next=${encodeURIComponent(`/projects/${slug}`)}`}
               className="flex w-full items-center justify-center rounded-xl bg-amber px-5 py-3 font-semibold text-ink"
+              analyticsId="project-signup-cta"
+              analyticsProps={{ project_id: slug }}
             >
               سجل مجانًا وابدأ
-            </Link>
+            </TrackedLink>
           )}
         </Card>
       </div>
@@ -135,9 +138,11 @@ export function ProjectPage() {
                       const open = l.isPreview || Boolean(user)
                       return (
                         <li key={l.id}>
-                          <Link
+                          <TrackedLink
                             to={`/projects/${slug}/lessons/${l.slug}`}
                             className="flex items-center justify-between gap-4 py-3 text-sm hover:text-amber-2"
+                            analyticsId="project-lesson-link"
+                            analyticsProps={{ project_id: slug, lesson_id: l.slug }}
                           >
                             <span className="flex items-center gap-2">
                               {open ? (
@@ -155,7 +160,7 @@ export function ProjectPage() {
                               )}
                               {l.durationMinutes} د
                             </span>
-                          </Link>
+                          </TrackedLink>
                         </li>
                       )
                     })}

@@ -85,7 +85,7 @@ export function Pricing() {
                 to={user ? '/dashboard' : '/signup'}
                 className="w-full"
                 onClick={() => trackEvent('free_cta_click', '/pricing')}
-                data-attr="pricing-free-cta"
+                analyticsId="pricing-free-cta"
               >
                 {user ? 'روح للوحتك' : 'ابدأ مجانًا'}
               </ButtonLink>
@@ -93,7 +93,7 @@ export function Pricing() {
               <ButtonLink
                 to={user ? '/checkout' : `/signup?next=${encodeURIComponent('/checkout')}`}
                 className="w-full"
-                data-attr="pricing-pro-cta"
+                analyticsId="pricing-pro-cta"
               >
                 اشترك في {tier.name}
               </ButtonLink>

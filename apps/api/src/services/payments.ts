@@ -10,6 +10,7 @@ import {
   inquireByMerchantOrderId,
   paymobStatus,
 } from './paymob.js'
+import { claimOnce } from './analytics-claims.js'
 import { captureForUser } from './product-analytics.js'
 
 export const PRO_PRICE_MINOR = 24900
@@ -152,13 +153,38 @@ async function emitPurchaseCompletedOnce(purchaseId: string, userId: string, amo
     data: { analyticsCapturedAt: new Date() },
   })
   if (claimed.count !== 1) return false
-  await captureForUser(userId, 'purchase_completed', {
-    plan: 'pro',
-    amount_egp: amountMinor / MINOR_PER_EGP,
-    currency: CURRENCY,
-    provider: PROVIDER,
-    purchase_id: purchaseId,
+  await captureForUser(
+    userId,
+    'purchase_completed',
+    {
+      plan: 'pro',
+      amount_egp: amountMinor / MINOR_PER_EGP,
+      currency: CURRENCY,
+      provider: PROVIDER,
+      purchase_id: purchaseId,
+    },
+    { setPersonProperties: { plan: 'pro' }, flush: true },
+  )
+  return true
+}
+
+async function emitPurchaseRefundedOnce(purchaseId: string, userId: string, amountMinor: number) {
+  if (!(await claimOnce('purchase_refunded', userId, purchaseId))) return false
+  const stillPro = await prisma.entitlement.count({
+    where: { userId, tier: 'PRO', revokedAt: null },
   })
+  await captureForUser(
+    userId,
+    'purchase_refunded',
+    {
+      plan: 'pro',
+      amount_egp: amountMinor / MINOR_PER_EGP,
+      currency: CURRENCY,
+      provider: PROVIDER,
+      purchase_id: purchaseId,
+    },
+    { setPersonProperties: { plan: stillPro > 0 ? 'pro' : 'free' }, flush: true },
+  )
   return true
 }
 
@@ -189,6 +215,7 @@ export async function processTransaction(
         },
       })
       log(purchase.id, `refunded via ${source}`)
+      await emitPurchaseRefundedOnce(purchase.id, purchase.userId, purchase.amountMinor)
       return 'refunded'
     }
     return 'ignored_stale'

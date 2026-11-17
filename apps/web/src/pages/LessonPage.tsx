@@ -2,12 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { LessonView } from '@pb/shared'
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, Clock, Lock } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { Container } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
-import { Badge, ButtonLink, Card, ErrorState, Loading, Notice } from '../components/ui'
+import { Badge, ButtonLink, Card, ErrorState, Loading, Notice, TrackedLink } from '../components/ui'
 import { ApiRequestError, api, errorMessage } from '../lib/api'
-import { analytics, trackEvent } from '../lib/analytics'
+import { analytics, trackClick } from '../lib/analytics'
 import { useMe } from '../lib/auth'
 import { useLesson } from '../lib/queries'
 import { usePageTitle } from '../lib/seo'
@@ -82,9 +82,13 @@ function Checkpoints({
       {!canTrack && (
         <div className="mb-6">
           <Notice tone="teal">
-            <Link to="/signup" className="font-semibold text-teal underline">
+            <TrackedLink
+              to="/signup"
+              className="font-semibold text-teal underline"
+              analyticsId="lesson-locked-signup"
+            >
               سجل مجانًا
-            </Link>{' '}
+            </TrackedLink>{' '}
             عشان تحفظ تقدمك وتفتح باقي الدروس.
           </Notice>
         </div>
@@ -100,8 +104,16 @@ function Checkpoints({
                 className="mt-1 size-5 shrink-0 accent-[var(--color-teal)]"
                 checked={c.completed}
                 disabled={!canTrack}
-                onChange={(e) => toggle.mutate({ id: c.id, completed: e.target.checked })}
-                data-attr="checkpoint-toggle"
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    trackClick('checkpoint-toggle', {
+                      project_id: lesson.project.slug,
+                      lesson_id: lesson.slug,
+                    })
+                  }
+                  toggle.mutate({ id: c.id, completed: e.target.checked })
+                }}
+                data-analytics-id="checkpoint-toggle"
               />
               <span>
                 <span className="mb-1 block font-semibold">{c.title}</span>
@@ -140,11 +152,12 @@ export function LessonPage() {
   useEffect(() => {
     if (!lesson || started.current === lesson.id) return
     started.current = lesson.id
-    if (lesson.progressStatus === null) {
-      analytics.capture('lesson_started', { project_id: slug, lesson_id: lessonSlug })
+    // lesson_started is emitted once per user+lesson by the server when progress is first written.
+    // Anonymous preview readers get a separate event so they never inflate the learning funnel.
+    if (!user) {
+      analytics.capture('lesson_previewed', { project_id: slug, lesson_id: lessonSlug })
+      return
     }
-    if (!user) return
-    trackEvent('lesson_started')
     if (lesson.progressStatus === null) {
       void api
         .put(`/api/lessons/${lesson.id}/progress`, { status: 'IN_PROGRESS' })
@@ -170,12 +183,16 @@ export function LessonPage() {
           <div className="flex flex-wrap justify-center gap-3">
             <ButtonLink
               to={`/signup?next=${encodeURIComponent(`/projects/${slug}/lessons/${lessonSlug}`)}`}
+              analyticsId="lesson-locked-signup"
+              analyticsProps={{ project_id: slug, lesson_id: lessonSlug }}
             >
               سجل مجانًا
             </ButtonLink>
             <ButtonLink
               to={`/login?next=${encodeURIComponent(`/projects/${slug}/lessons/${lessonSlug}`)}`}
               variant="ghost"
+              analyticsId="lesson-locked-login"
+              analyticsProps={{ project_id: slug, lesson_id: lessonSlug }}
             >
               عندي حساب
             </ButtonLink>
@@ -188,7 +205,12 @@ export function LessonPage() {
         <Container className="max-w-xl text-center">
           <Lock className="mx-auto mb-4 size-8 text-amber" aria-hidden />
           <h1 className="mb-3 text-2xl font-bold">الدرس ده جزء من Pro</h1>
-          <ButtonLink to="/pricing" variant="ghost">
+          <ButtonLink
+            to="/pricing"
+            variant="ghost"
+            analyticsId="lesson-pro-pricing"
+            analyticsProps={{ project_id: slug, lesson_id: lessonSlug }}
+          >
             شوف التفاصيل
           </ButtonLink>
         </Container>
@@ -208,9 +230,14 @@ export function LessonPage() {
   return (
     <Container className="max-w-3xl">
       <nav aria-label="مسار التنقل" className="mb-8 text-sm text-dim">
-        <Link to={`/projects/${slug}`} className="hover:text-paper">
+        <TrackedLink
+          to={`/projects/${slug}`}
+          className="hover:text-paper"
+          analyticsId="lesson-breadcrumb-project"
+          analyticsProps={{ project_id: slug, lesson_id: lessonSlug }}
+        >
           {lesson.project.title}
-        </Link>
+        </TrackedLink>
         <span className="mx-2" aria-hidden>
           /
         </span>
@@ -241,15 +268,23 @@ export function LessonPage() {
 
       <Markdown
         source={lesson.contentMarkdown}
-        onCodeAction={(action, language) => {
+        onCodeAction={(action, block) => {
           const context = { project_id: slug, lesson_id: lessonSlug }
           if (action === 'reveal') {
+            trackClick('code-spoiler-toggle', context)
             analytics.capture('feature_used', {
               feature_name: 'spoiler_revealed',
               source: lessonSlug,
             })
-          } else if (language === 'text') {
-            analytics.capture('prompt_copied', { ...context, feature_name: 'lesson_prompt' })
+            return
+          }
+          trackClick('code-copy', context)
+          if (block.promptId) {
+            analytics.capture('prompt_copied', {
+              ...context,
+              prompt_id: block.promptId,
+              feature_name: 'lesson_prompt',
+            })
           } else {
             analytics.capture('feature_used', { feature_name: 'code_copied', source: lessonSlug })
           }
@@ -260,28 +295,32 @@ export function LessonPage() {
 
       <nav className="mt-12 grid gap-4 sm:grid-cols-2" aria-label="التنقل بين الدروس">
         {lesson.prev ? (
-          <Link
+          <TrackedLink
             to={`/projects/${slug}/lessons/${lesson.prev.slug}`}
             className="rounded-xl border border-line p-4 hover:border-line-2"
+            analyticsId="lesson-prev"
+            analyticsProps={{ project_id: slug, lesson_id: lesson.prev.slug }}
           >
             <span className="mb-1 flex items-center gap-1 text-xs text-dim">
               <ArrowRight className="size-3" aria-hidden /> السابق
             </span>
             <span className="font-medium">{lesson.prev.title}</span>
-          </Link>
+          </TrackedLink>
         ) : (
           <span />
         )}
         {lesson.next && (
-          <Link
+          <TrackedLink
             to={`/projects/${slug}/lessons/${lesson.next.slug}`}
             className="rounded-xl border border-line p-4 text-end hover:border-line-2"
+            analyticsId="lesson-next"
+            analyticsProps={{ project_id: slug, lesson_id: lesson.next.slug }}
           >
             <span className="mb-1 flex items-center justify-end gap-1 text-xs text-dim">
               التالي <ArrowLeft className="size-3" aria-hidden />
             </span>
             <span className="font-medium">{lesson.next.title}</span>
-          </Link>
+          </TrackedLink>
         )}
       </nav>
     </Container>

@@ -117,10 +117,11 @@ describe('consent gating', () => {
     consent.setConsent({ analytics: true, replay: false })
     await flush()
     expect(ph.identify).toHaveBeenCalledTimes(1)
-    expect(ph.identify).toHaveBeenCalledWith('user_before_consent', {
-      role: 'STUDENT',
-      plan: 'free',
-    })
+    expect(ph.identify).toHaveBeenCalledWith(
+      'user_before_consent',
+      { role: 'STUDENT', plan: 'free' },
+      {},
+    )
   })
 
   it('H-1: after revoke and re-grant the user is identified again', async () => {
@@ -131,7 +132,7 @@ describe('consent gating', () => {
     consent.setConsent({ analytics: true, replay: false })
     await flush()
     expect(ph.identify).toHaveBeenCalledTimes(2)
-    expect(ph.identify).toHaveBeenLastCalledWith('u_regrant', { role: 'STUDENT', plan: 'pro' })
+    expect(ph.identify).toHaveBeenLastCalledWith('u_regrant', { role: 'STUDENT', plan: 'pro' }, {})
   })
 
   it('H-4: the page visible when consent is granted gets exactly one $pageview', async () => {
@@ -202,7 +203,7 @@ describe('events and properties', () => {
     mod.analytics.identify(user)
     mod.analytics.identify(user)
     expect(ph.identify).toHaveBeenCalledTimes(1)
-    expect(ph.identify).toHaveBeenCalledWith('user_123', { role: 'STUDENT', plan: 'free' })
+    expect(ph.identify).toHaveBeenCalledWith('user_123', { role: 'STUDENT', plan: 'free' }, {})
   })
 
   it('reset on logout clears identity so the next login re-identifies', () => {

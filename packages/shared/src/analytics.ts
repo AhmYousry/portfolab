@@ -16,10 +16,10 @@ export const ANALYTICS_EVENTS = [
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number]
 
+// lesson_started is written by the server only (on first lesson progress) to avoid double counting.
 export const CLIENT_ANALYTICS_EVENTS = [
   'landing_view',
   'free_cta_click',
-  'lesson_started',
   'pro_offer_view',
 ] as const satisfies readonly AnalyticsEventName[]
 
@@ -49,12 +49,84 @@ export type AnalyticsEventInput = z.infer<typeof analyticsEventSchema>
 
 export type Plan = 'free' | 'pro'
 
+// Stable ids for every tracked UI control. Rendered as data-analytics-id and sent as
+// `analytics_id` on `button_clicked`, so rankings survive copy and layout changes.
+export const ANALYTICS_IDS = [
+  'nav-logo',
+  'nav-curriculum',
+  'nav-pricing',
+  'nav-dashboard',
+  'nav-progress',
+  'nav-resources',
+  'nav-admin',
+  'nav-account',
+  'nav-login',
+  'nav-signup',
+  'nav-logout',
+  'nav-menu-toggle',
+  'footer-privacy',
+  'footer-terms',
+  'footer-refund',
+  'footer-contact',
+  'footer-privacy-settings',
+  'hero-free-cta',
+  'hero-preview-lesson',
+  'landing-curriculum-link',
+  'pricing-free-cta',
+  'pricing-pro-cta',
+  'project-card',
+  'project-start',
+  'project-signup-cta',
+  'project-lesson-link',
+  'dashboard-continue',
+  'dashboard-start-taskflow',
+  'progress-lesson-link',
+  'lesson-prev',
+  'lesson-next',
+  'lesson-breadcrumb-project',
+  'lesson-locked-signup',
+  'lesson-locked-login',
+  'lesson-pro-pricing',
+  'code-copy',
+  'code-spoiler-toggle',
+  'checkpoint-toggle',
+  'resource-download',
+  'signup-submit',
+  'login-submit',
+  'forgot-password-submit',
+  'reset-password-submit',
+  'onboarding-save',
+  'onboarding-skip',
+  'checkout-pay',
+  'checkout-retry',
+  'checkout-dashboard',
+  'consent-accept',
+  'consent-decline',
+] as const
+
+export type AnalyticsId = (typeof ANALYTICS_IDS)[number]
+
 export interface ProductEventMap {
   signup_completed: { source?: string; campaign?: string }
+  signup_failed: { reason: string }
   login_completed: { source?: string }
+  login_failed: { reason: string }
+  logged_out: { source?: string }
+  onboarding_completed: { source: 'saved' | 'skipped' }
+  button_clicked: {
+    analytics_id: AnalyticsId
+    path: string
+    resource_id?: string
+    project_id?: string
+    lesson_id?: string
+  }
   free_project_started: { project_id: string; source?: string }
+  pro_project_started: { project_id: string; source?: string }
+  lesson_previewed: { project_id: string; lesson_id: string }
   lesson_started: { project_id: string; lesson_id: string }
   lesson_completed: { project_id: string; lesson_id: string }
+  checkpoint_completed: { project_id: string; lesson_id: string; checkpoint_id: string }
+  resource_downloaded: { resource_id: string; project_id?: string; plan: Plan }
   prompt_copied: {
     project_id?: string
     lesson_id?: string
@@ -72,6 +144,13 @@ export interface ProductEventMap {
     provider: 'paymob'
     purchase_id: string
   }
+  purchase_refunded: {
+    plan: 'pro'
+    amount_egp: number
+    currency: 'EGP'
+    provider: 'paymob'
+    purchase_id: string
+  }
   feature_used: { feature_name: string; source?: string }
   client_error: { reason: string; feature_name?: string }
 }
@@ -82,6 +161,9 @@ export const ALLOWED_PROPERTY_KEYS = new Set([
   'project_id',
   'lesson_id',
   'prompt_id',
+  'checkpoint_id',
+  'resource_id',
+  'analytics_id',
   'feature_name',
   'source',
   'plan',
@@ -98,6 +180,10 @@ export const ALLOWED_PROPERTY_KEYS = new Set([
   'utm_medium',
   'utm_campaign',
   'utm_content',
+  'initial_utm_source',
+  'initial_utm_medium',
+  'initial_utm_campaign',
+  'initial_utm_content',
   'app',
 ])
 
@@ -147,4 +233,20 @@ export function scrubUrl(raw: string): string {
   } catch {
     return ''
   }
+}
+
+const ERROR_TEXT_MAX = 200
+const URL_IN_TEXT = /\b(?:https?:\/\/|\/)[^\s"'<>]*\?[^\s"'<>]*/gi
+const EMAIL_IN_TEXT = /[^\s@"'<>]+@[^\s@"'<>]+\.[^\s@"'<>]+/g
+const LONG_TOKEN = /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{24,}\b/g
+const CARD_LIKE = /\b(?:\d[ -]?){12,19}\b/g
+
+// Error messages can embed URLs (with tokens), emails or ids. Strip them before sending.
+export function sanitizeErrorText(raw: string): string {
+  return raw
+    .replace(URL_IN_TEXT, (match) => scrubUrl(match).split('?')[0] + '?[query]')
+    .replace(EMAIL_IN_TEXT, '[email]')
+    .replace(CARD_LIKE, '[number]')
+    .replace(LONG_TOKEN, '[token]')
+    .slice(0, ERROR_TEXT_MAX)
 }

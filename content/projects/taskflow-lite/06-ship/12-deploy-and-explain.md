@@ -70,7 +70,7 @@ checkpoints:
 
 ## AI mentor prompt (F10)
 
-```text
+```text prompt=F10
 Act as a technical interviewer. Review my README, screenshots, tests and architecture notes. Identify gaps, ask me five questions about my design decisions, and help me write an honest project summary without exaggerating my contributions.
 ```
 

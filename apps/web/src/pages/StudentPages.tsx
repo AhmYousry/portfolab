@@ -1,5 +1,4 @@
 import { ArrowLeft, CheckCircle2, Circle, CircleDot, Download, FileText, Lock } from 'lucide-react'
-import { Link } from 'react-router'
 import { Container } from '../components/Layout'
 import {
   Badge,
@@ -9,7 +8,9 @@ import {
   Loading,
   PageHeader,
   ProgressBar,
+  TrackedLink,
 } from '../components/ui'
+import { trackClick } from '../lib/analytics'
 import { useMe } from '../lib/auth'
 import { useDashboard, useProgress, useResources } from '../lib/queries'
 
@@ -30,7 +31,13 @@ export function Dashboard() {
           <p className="mb-6 text-muted">
             ابدأ بـ TaskFlow Lite: أول مشروع full stack كامل ومجاني.
           </p>
-          <ButtonLink to="/projects/taskflow-lite">ابدأ TaskFlow Lite</ButtonLink>
+          <ButtonLink
+            to="/projects/taskflow-lite"
+            analyticsId="dashboard-start-taskflow"
+            analyticsProps={{ project_id: 'taskflow-lite' }}
+          >
+            ابدأ TaskFlow Lite
+          </ButtonLink>
         </Card>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -53,7 +60,11 @@ export function Dashboard() {
               <div className="mt-6 rounded-xl border border-line p-4">
                 <p className="mb-1 text-xs text-dim">الخطوة الجاية · {p.nextLesson.moduleTitle}</p>
                 <p className="mb-4 font-semibold">{p.nextLesson.title}</p>
-                <ButtonLink to={`/projects/${p.project.slug}/lessons/${p.nextLesson.slug}`}>
+                <ButtonLink
+                  to={`/projects/${p.project.slug}/lessons/${p.nextLesson.slug}`}
+                  analyticsId="dashboard-continue"
+                  analyticsProps={{ project_id: p.project.slug, lesson_id: p.nextLesson.slug }}
+                >
                   كمّل <ArrowLeft className="size-4" aria-hidden />
                 </ButtonLink>
               </div>
@@ -91,9 +102,13 @@ export function Progress() {
       {data?.length === 0 && (
         <p className="text-muted">
           لسه مفيش تقدم.{' '}
-          <Link to="/projects/taskflow-lite" className="text-amber-2">
+          <TrackedLink
+            to="/projects/taskflow-lite"
+            className="text-amber-2"
+            analyticsId="dashboard-start-taskflow"
+          >
             ابدأ أول مشروع
-          </Link>
+          </TrackedLink>
           .
         </p>
       )}
@@ -114,14 +129,16 @@ export function Progress() {
                   <ul className="space-y-2">
                     {lessons.map((l) => (
                       <li key={l.id}>
-                        <Link
+                        <TrackedLink
                           to={`/projects/${p.project.slug}/lessons/${l.slug}`}
                           className="flex items-center gap-3 text-sm hover:text-amber-2"
+                          analyticsId="progress-lesson-link"
+                          analyticsProps={{ project_id: p.project.slug, lesson_id: l.slug }}
                         >
                           {STATUS_ICON[l.status as keyof typeof STATUS_ICON] ??
                             STATUS_ICON.NOT_STARTED}
                           {l.title}
-                        </Link>
+                        </TrackedLink>
                       </li>
                     ))}
                   </ul>
@@ -170,6 +187,13 @@ export function Resources() {
               ) : (
                 <a
                   href={`/api/resources/${r.id}/download`}
+                  data-analytics-id="resource-download"
+                  onClick={() =>
+                    trackClick('resource-download', {
+                      resource_id: r.key,
+                      project_id: r.projectSlug ?? undefined,
+                    })
+                  }
                   className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-line-2 px-4 py-2 text-sm hover:bg-white/5"
                 >
                   <Download className="size-4" aria-hidden /> تحميل

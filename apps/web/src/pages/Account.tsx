@@ -154,7 +154,10 @@ function AnalyticsSettings() {
               update({ analytics: e.target.checked, replay: e.target.checked && consent.replay })
             }
           />
-          <span>تحليلات استخدام مجهولة (PostHog). مش بنبعت إيميل أو اسم أو بيانات دفع.</span>
+          <span>
+            تحليلات استخدام (PostHog) مربوطة بمعرّف داخلي لحسابك. مش بنبعت إيميل أو اسم أو بيانات
+            دفع.
+          </span>
         </label>
         <label className="flex gap-3">
           <input

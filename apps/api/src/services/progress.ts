@@ -1,6 +1,7 @@
-import type { ProgressStatus } from '@prisma/client'
+import { Prisma, type ProgressStatus } from '@prisma/client'
 import { prisma } from '../db.js'
-import { track, trackOnce } from './analytics.js'
+import { track } from './analytics.js'
+import { claimOnce } from './analytics-claims.js'
 import { captureForUser } from './product-analytics.js'
 
 const publishedLessonsOf = (projectId: string) => ({
@@ -8,28 +9,39 @@ const publishedLessonsOf = (projectId: string) => ({
   module: { projectId, status: 'PUBLISHED' as const },
 })
 
+async function upsertEnrollment(userId: string, projectId: string) {
+  const where = { userId_projectId: { userId, projectId } }
+  try {
+    return await prisma.enrollment.upsert({ where, create: { userId, projectId }, update: {} })
+  } catch (error) {
+    const raced = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+    if (!raced) throw error
+    return prisma.enrollment.findUniqueOrThrow({ where })
+  }
+}
+
 export async function ensureEnrollment(userId: string, projectId: string) {
-  const existing = await prisma.enrollment.findUnique({
-    where: { userId_projectId: { userId, projectId } },
-  })
-  if (existing) return existing
-  const created = await prisma.enrollment.upsert({
-    where: { userId_projectId: { userId, projectId } },
-    create: { userId, projectId },
-    update: {},
-  })
+  const enrollment = await upsertEnrollment(userId, projectId)
+  if (!(await claimOnce('project_started', userId, projectId))) return enrollment
+
   await track({ event: 'project_enrolled', userId, path: projectId })
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { slug: true, tier: true },
   })
-  if (project?.tier === 'FREE') {
-    await captureForUser(userId, 'free_project_started', {
-      project_id: project.slug,
-      source: 'enrollment',
-    })
+  if (project) {
+    const event = project.tier === 'FREE' ? 'free_project_started' : 'pro_project_started'
+    await captureForUser(userId, event, { project_id: project.slug, source: 'enrollment' })
   }
-  return created
+  return enrollment
+}
+
+async function lessonSlugs(lessonId: string) {
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: { slug: true, module: { select: { project: { select: { slug: true } } } } },
+  })
+  return lesson ? { project_id: lesson.module.project.slug, lesson_id: lesson.slug } : null
 }
 
 export async function setLessonProgress(
@@ -39,31 +51,45 @@ export async function setLessonProgress(
   status: ProgressStatus,
 ) {
   await ensureEnrollment(userId, projectId)
-  const before = await prisma.lessonProgress.findUnique({
-    where: { userId_lessonId: { userId, lessonId } },
-  })
   const progress = await prisma.lessonProgress.upsert({
     where: { userId_lessonId: { userId, lessonId } },
     create: { userId, lessonId, status, completedAt: status === 'COMPLETED' ? new Date() : null },
     update: { status, completedAt: status === 'COMPLETED' ? new Date() : null },
   })
-  if (!before && status !== 'NOT_STARTED') {
+
+  if (status !== 'NOT_STARTED' && (await claimOnce('lesson_started', userId, lessonId))) {
     await track({ event: 'lesson_started', userId, path: lessonId })
+    const ids = await lessonSlugs(lessonId)
+    if (ids) await captureForUser(userId, 'lesson_started', ids)
   }
-  if (status === 'COMPLETED' && before?.status !== 'COMPLETED') {
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: lessonId },
-      select: { slug: true, module: { select: { project: { select: { slug: true } } } } },
-    })
-    if (lesson) {
-      await captureForUser(userId, 'lesson_completed', {
-        project_id: lesson.module.project.slug,
-        lesson_id: lesson.slug,
-      })
-    }
+  if (status === 'COMPLETED' && (await claimOnce('lesson_completed', userId, lessonId))) {
+    const ids = await lessonSlugs(lessonId)
+    if (ids) await captureForUser(userId, 'lesson_completed', ids)
   }
   if (status === 'COMPLETED') await checkProjectCompletion(userId, projectId)
   return progress
+}
+
+export async function recordCheckpointCompleted(userId: string, checkpointId: string) {
+  if (!(await claimOnce('checkpoint_completed', userId, checkpointId))) return false
+  await track({ event: 'checkpoint_completed', userId, path: checkpointId })
+  const checkpoint = await prisma.checkpoint.findUnique({
+    where: { id: checkpointId },
+    select: {
+      key: true,
+      lesson: {
+        select: { slug: true, module: { select: { project: { select: { slug: true } } } } },
+      },
+    },
+  })
+  if (checkpoint) {
+    await captureForUser(userId, 'checkpoint_completed', {
+      project_id: checkpoint.lesson.module.project.slug,
+      lesson_id: checkpoint.lesson.slug,
+      checkpoint_id: checkpoint.key,
+    })
+  }
+  return true
 }
 
 export async function syncLessonFromCheckpoints(
@@ -91,16 +117,15 @@ async function checkProjectCompletion(userId: string, projectId: string) {
     where: { userId, status: 'COMPLETED', lesson: publishedLessonsOf(projectId) },
   })
   if (total === 0 || completed !== total) return
-  const event = project.tier === 'FREE' ? 'free_project_completed' : 'pro_project_completed'
-  const first = await trackOnce({ event, userId, path: project.slug })
-  if (first) {
-    await captureForUser(userId, 'project_completed', {
-      project_id: project.slug,
-      plan: project.tier === 'FREE' ? 'free' : 'pro',
-    })
-  }
+  if (!(await claimOnce('project_completed', userId, projectId))) return
+  const plan = project.tier === 'FREE' ? 'free' : 'pro'
+  await track({
+    event: project.tier === 'FREE' ? 'free_project_completed' : 'pro_project_completed',
+    userId,
+    path: project.slug,
+  })
+  await captureForUser(userId, 'project_completed', { project_id: project.slug, plan })
 }
-
 export async function projectProgress(userId: string, projectId: string) {
   const lessons = await prisma.lesson.findMany({
     where: publishedLessonsOf(projectId),

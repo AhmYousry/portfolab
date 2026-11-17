@@ -10,6 +10,7 @@ export const ORIGIN = 'http://localhost:5173'
 export const PASSWORD = 'correct-horse-battery'
 
 const TABLES = [
+  'AnalyticsClaim',
   'AuditLog',
   'LeadEvent',
   'WebhookEvent',

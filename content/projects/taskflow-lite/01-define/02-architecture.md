@@ -71,7 +71,7 @@ checkpoints:
 
 ## AI mentor prompt (F02)
 
-```text
+```text prompt=F02
 Review my TaskFlow Lite requirements and propose a simple React + Express + PostgreSQL architecture. Explain data flow and why each layer exists. Flag unnecessary complexity.
 ```
 

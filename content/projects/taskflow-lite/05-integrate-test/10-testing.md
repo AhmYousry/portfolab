@@ -83,7 +83,7 @@ it('returns a safe 500 without leaking internals', async () => {
 
 ## AI mentor prompt (F08)
 
-```text
+```text prompt=F08
 Review my TaskFlow Lite API behavior and propose Vitest/Supertest tests covering success, invalid input, not-found and database failures. Explain what each test proves.
 ```
 

@@ -6,6 +6,7 @@ import { safeNext } from '../components/Guards'
 import { Container } from '../components/Layout'
 import { Button, Card, Select } from '../components/ui'
 import { api, errorMessage } from '../lib/api'
+import { analytics, trackClick } from '../lib/analytics'
 import { useAuthActions } from '../lib/auth'
 
 const EXPERIENCE = [
@@ -43,12 +44,14 @@ export function Onboarding() {
       }),
     onSuccess: ({ user }) => {
       setUser(user)
+      analytics.capture('onboarding_completed', { source: 'saved' })
       navigate(next, { replace: true })
     },
   })
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    trackClick('onboarding-save')
     save.mutate()
   }
 
@@ -60,7 +63,7 @@ export function Onboarding() {
       <h1 className="mb-2 text-3xl font-bold">3 أسئلة سريعة (اختيارية)</h1>
       <p className="mb-8 text-muted">بتساعدنا نحسن المحتوى. تقدر تتخطاها خالص.</p>
       <Card>
-        <form onSubmit={submit} className="space-y-5">
+        <form onSubmit={submit} className="space-y-5 ph-no-capture">
           <Select
             label="خبرتك"
             options={EXPERIENCE}
@@ -80,10 +83,18 @@ export function Onboarding() {
             </p>
           )}
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" loading={save.isPending}>
+            <Button type="submit" loading={save.isPending} analyticsId="onboarding-save">
               احفظ وكمّل
             </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate(next, { replace: true })}>
+            <Button
+              type="button"
+              variant="ghost"
+              analyticsId="onboarding-skip"
+              onClick={() => {
+                analytics.capture('onboarding_completed', { source: 'skipped' })
+                navigate(next, { replace: true })
+              }}
+            >
               تخطى
             </Button>
           </div>

@@ -109,7 +109,7 @@ npm run db:migrate --workspace server -- --name add-task
 
 ## AI mentor prompt (F03)
 
-```text
+```text prompt=F03
 Help me design a Prisma Task model with status, priority and due date. Explain field types, defaults, validation and migration risks. Ask me to justify each field.
 ```
 

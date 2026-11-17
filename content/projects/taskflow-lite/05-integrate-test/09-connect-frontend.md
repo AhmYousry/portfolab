@@ -101,7 +101,7 @@ async function handleDelete(task) {
 
 ## AI mentor prompt (F07)
 
-```text
+```text prompt=F07
 I'm seeing [error] when [steps]. Here are logs and relevant code: [paste, with secrets removed]. Rank likely causes, suggest minimal reproduction, and tell me what to inspect before changing code.
 ```
 

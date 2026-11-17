@@ -7,6 +7,8 @@ import {
   useId,
 } from 'react'
 import { Link, type LinkProps } from 'react-router'
+import type { AnalyticsId } from '@pb/shared'
+import { type ClickProps, trackClick } from '../lib/analytics'
 
 type Variant = 'primary' | 'ghost' | 'danger' | 'quiet'
 
@@ -21,18 +23,33 @@ const VARIANTS: Record<Variant, string> = {
 const BASE =
   'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[0.95rem] transition duration-150 disabled:cursor-not-allowed disabled:opacity-50'
 
+interface Tracking {
+  analyticsId?: AnalyticsId
+  analyticsProps?: ClickProps
+}
+
 export function Button({
   variant = 'primary',
   loading = false,
   className = '',
   children,
+  analyticsId,
+  analyticsProps,
+  onClick,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & Tracking & { variant?: Variant; loading?: boolean }) {
+  // Submit buttons are tracked in the form's onSubmit (covers Enter key), never on click.
+  const trackOnClick = analyticsId && props.type !== 'submit'
   return (
     <button
       className={`${BASE} ${VARIANTS[variant]} ${className}`}
-      disabled={loading || props.disabled}
       {...props}
+      disabled={loading || props.disabled}
+      {...(analyticsId ? { 'data-analytics-id': analyticsId } : {})}
+      onClick={(event) => {
+        if (trackOnClick) trackClick(analyticsId, analyticsProps)
+        onClick?.(event)
+      }}
     >
       {loading && <Loader2 className="size-4 animate-spin" aria-hidden />}
       {children}
@@ -40,12 +57,43 @@ export function Button({
   )
 }
 
+export function TrackedLink({
+  analyticsId,
+  analyticsProps,
+  onClick,
+  ...props
+}: LinkProps & Required<Pick<Tracking, 'analyticsId'>> & Pick<Tracking, 'analyticsProps'>) {
+  return (
+    <Link
+      {...props}
+      {...(analyticsId ? { 'data-analytics-id': analyticsId } : {})}
+      onClick={(event) => {
+        trackClick(analyticsId, analyticsProps)
+        onClick?.(event)
+      }}
+    />
+  )
+}
+
 export function ButtonLink({
   variant = 'primary',
   className = '',
+  analyticsId,
+  analyticsProps,
+  onClick,
   ...props
-}: LinkProps & { variant?: Variant }) {
-  return <Link className={`${BASE} ${VARIANTS[variant]} ${className}`} {...props} />
+}: LinkProps & Tracking & { variant?: Variant }) {
+  return (
+    <Link
+      className={`${BASE} ${VARIANTS[variant]} ${className}`}
+      {...props}
+      {...(analyticsId ? { 'data-analytics-id': analyticsId } : {})}
+      onClick={(event) => {
+        if (analyticsId) trackClick(analyticsId, analyticsProps)
+        onClick?.(event)
+      }}
+    />
+  )
 }
 
 export function Card({ className = '', children }: { className?: string; children: ReactNode }) {

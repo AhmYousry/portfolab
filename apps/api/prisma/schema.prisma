@@ -78,6 +78,20 @@ model User {
   entitlements        Entitlement[]
   leadEvents          LeadEvent[]
   auditLogs           AuditLog[]
+  analyticsClaims     AnalyticsClaim[]
+}
+
+// One row per "this event may fire only once for this user + subject".
+// Inserted atomically (primary key) before emitting; never purged by retention.
+model AnalyticsClaim {
+  event     String
+  userId    String
+  subject   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([event, userId, subject])
 }
 
 model Session {

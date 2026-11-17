@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { BRAND } from '@pb/shared'
 import { CheckCircle2, Clock, Lock, XCircle } from 'lucide-react'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Container } from '../components/Layout'
 import {
@@ -15,7 +15,7 @@ import {
   PageHeader,
 } from '../components/ui'
 import { ApiRequestError, api, errorMessage, fieldErrors } from '../lib/api'
-import { analytics } from '../lib/analytics'
+import { analytics, trackClick } from '../lib/analytics'
 import { useMe } from '../lib/auth'
 import { usePricing } from '../lib/queries'
 
@@ -31,9 +31,13 @@ export function Checkout() {
   const pro = tiers?.find((t) => t.id === 'PRO')
   const [form, setForm] = useState({ firstName: '', lastName: '', phoneNumber: '' })
 
+  const viewTracked = useRef(false)
+  const canBuy = !isLoading && Boolean(pro?.checkoutEnabled) && !user?.hasPro
   useEffect(() => {
+    if (!canBuy || viewTracked.current) return
+    viewTracked.current = true
     analytics.capture('pro_page_viewed', { source: 'checkout' })
-  }, [])
+  }, [canBuy])
 
   const start = useMutation({
     mutationFn: () =>
@@ -85,6 +89,7 @@ export function Checkout() {
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    trackClick('checkout-pay')
     start.mutate()
   }
 
@@ -132,7 +137,7 @@ export function Checkout() {
             type="submit"
             className="w-full"
             loading={start.isPending}
-            data-attr="checkout-pay"
+            analyticsId="checkout-pay"
           >
             كمّل للدفع بـ Paymob
           </Button>
@@ -234,9 +239,13 @@ export function CheckoutStatus() {
         <h1 className="mb-3 text-2xl font-bold">{view.title}</h1>
         <p className="mb-8 text-muted">{view.body}</p>
       </div>
-      {data.status === 'PAID' && <ButtonLink to="/dashboard">روح للوحتك</ButtonLink>}
+      {data.status === 'PAID' && (
+        <ButtonLink to="/dashboard" analyticsId="checkout-dashboard">
+          روح للوحتك
+        </ButtonLink>
+      )}
       {data.status === 'FAILED' && (
-        <ButtonLink to="/checkout" data-attr="checkout-retry">
+        <ButtonLink to="/checkout" analyticsId="checkout-retry">
           جرب تاني
         </ButtonLink>
       )}

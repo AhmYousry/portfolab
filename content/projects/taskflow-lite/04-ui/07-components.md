@@ -130,7 +130,7 @@ async function handleSubmit(event) {
 
 ## AI mentor prompt (F05)
 
-```text
+```text prompt=F05
 Break my TaskFlow Lite React UI into small components and state responsibilities. Explain form validation, loading, empty and error states. Give an implementation order.
 ```
 

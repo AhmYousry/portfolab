@@ -150,7 +150,7 @@ npx vitest run
 
 ## AI mentor prompt (F06)
 
-```text
+```text prompt=F06
 I'm implementing [feature]. Here is my code: [paste]. Give me hints first, then a small targeted example only if necessary. Preserve my existing style and explain every change.
 ```
 

@@ -124,7 +124,7 @@ it('only changes the fields that were sent', async () => {
 
 ## AI mentor prompt (F04)
 
-```text
+```text prompt=F04
 Help me define REST endpoints for task CRUD and filtering. For each endpoint show request, success response, validation errors and HTTP status codes. Don't implement until I approve the contract.
 ```
 

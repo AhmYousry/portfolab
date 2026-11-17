@@ -46,7 +46,7 @@ TaskFlow Lite لمستخدم واحد بالقصد. **لو نشرته public، �
 
 ## AI mentor prompt (F09)
 
-```text
+```text prompt=F09
 Review this small full-stack task app for input validation, injection risks, secret handling, CORS and unsafe error exposure. Separate critical issues from optional hardening.
 ```
 

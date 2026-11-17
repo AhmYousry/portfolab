@@ -5,11 +5,16 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { safeNext } from '../components/Guards'
 import { Container } from '../components/Layout'
 import { Button, Card, Field, Notice } from '../components/ui'
-import { api, errorMessage, fieldErrors } from '../lib/api'
-import { getUtm } from '../lib/analytics'
+import { ApiRequestError, api, errorMessage, fieldErrors } from '../lib/api'
+import { analytics, getUtm, trackClick } from '../lib/analytics'
 import { useAuthActions, useMe } from '../lib/auth'
 
 const PASSWORD_MIN = 10
+
+// Only the API error code is sent (e.g. UNAUTHORIZED, CONFLICT, RATE_LIMITED), never form input.
+function failureReason(error: unknown): string {
+  return error instanceof ApiRequestError ? error.code : 'NETWORK'
+}
 
 function AuthShell({
   title,
@@ -44,12 +49,14 @@ export function Login() {
       signedIn(user, 'login', 'login_page')
       navigate(next, { replace: true })
     },
+    onError: (error) => analytics.capture('login_failed', { reason: failureReason(error) }),
   })
 
   if (me) return <Navigate to={next} replace />
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    trackClick('login-submit')
     login.mutate()
   }
 
@@ -79,7 +86,12 @@ export function Login() {
             {errorMessage(login.error)}
           </p>
         )}
-        <Button type="submit" className="w-full" loading={login.isPending}>
+        <Button
+          type="submit"
+          className="w-full"
+          loading={login.isPending}
+          analyticsId="login-submit"
+        >
           دخول
         </Button>
       </form>
@@ -116,6 +128,7 @@ export function Signup() {
       signedIn(user, 'signup', next ? 'signup_with_next' : 'signup_page')
       navigate(`/onboarding?next=${encodeURIComponent(safeNext(next))}`, { replace: true })
     },
+    onError: (error) => analytics.capture('signup_failed', { reason: failureReason(error) }),
   })
 
   if (me && !signup.isSuccess) return <Navigate to={safeNext(next)} replace />
@@ -125,6 +138,7 @@ export function Signup() {
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    trackClick('signup-submit')
     const found: Record<string, string> = {}
     if (form.displayName.trim().length < 2) found.displayName = 'اكتب اسمك (حرفين على الأقل)'
     if (!form.email.includes('@')) found.email = 'الإيميل مش صحيح'
@@ -133,6 +147,7 @@ export function Signup() {
     if (!form.acceptPrivacy) found.acceptPrivacy = 'لازم توافق على سياسة الخصوصية'
     setClientErrors(found)
     if (Object.keys(found).length === 0) signup.mutate()
+    else analytics.capture('signup_failed', { reason: 'client_validation' })
   }
 
   const update = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -198,7 +213,12 @@ export function Signup() {
             {errorMessage(signup.error)}
           </p>
         )}
-        <Button type="submit" className="w-full" loading={signup.isPending}>
+        <Button
+          type="submit"
+          className="w-full"
+          loading={signup.isPending}
+          analyticsId="signup-submit"
+        >
           اعمل حساب
         </Button>
       </form>
@@ -226,6 +246,7 @@ export function ForgotPassword() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
+            trackClick('forgot-password-submit')
             request.mutate()
           }}
           className="space-y-5 ph-no-capture"
@@ -285,6 +306,7 @@ export function ResetPassword() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
+            trackClick('reset-password-submit')
             reset.mutate()
           }}
           className="space-y-5 ph-no-capture"

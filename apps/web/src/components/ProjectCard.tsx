@@ -1,13 +1,14 @@
 import type { ProjectSummary } from '@pb/shared'
 import { ArrowLeft, Clock, Lock } from 'lucide-react'
-import { Link } from 'react-router'
-import { Badge } from './ui'
+import { Badge, TrackedLink } from './ui'
 
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const comingSoon = project.status === 'COMING_SOON'
   return (
-    <Link
+    <TrackedLink
       to={`/projects/${project.slug}`}
+      analyticsId="project-card"
+      analyticsProps={{ project_id: project.slug }}
       className="group relative flex h-full flex-col rounded-2xl border border-line bg-ink-2/80 p-6 transition hover:-translate-y-0.5 hover:border-line-2"
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -35,6 +36,6 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
         </span>
         <ArrowLeft className="size-4 transition group-hover:-translate-x-1" aria-hidden />
       </div>
-    </Link>
+    </TrackedLink>
   )
 }

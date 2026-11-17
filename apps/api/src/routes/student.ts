@@ -2,7 +2,6 @@ import { Router } from 'express'
 import { checkpointProgressSchema, idSchema, lessonProgressSchema, slugSchema } from '@pb/shared'
 import { prisma } from '../db.js'
 import { errors, ok, param, parse, requireUser } from '../http.js'
-import { track } from '../services/analytics.js'
 import { assertLessonReadable } from '../services/access.js'
 import {
   buildLessonView,
@@ -13,6 +12,7 @@ import {
 import {
   ensureEnrollment,
   projectProgress,
+  recordCheckpointCompleted,
   setLessonProgress,
   syncLessonFromCheckpoints,
 } from '../services/progress.js'
@@ -62,17 +62,12 @@ studentRouter.put('/checkpoints/:id/progress', async (req, res) => {
   if (!checkpoint) throw errors.notFound('الـ checkpoint مش موجود')
   const lesson = await assertLessonReadable(checkpoint.lesson, user)
 
-  const before = await prisma.checkpointProgress.findUnique({
-    where: { userId_checkpointId: { userId: user.id, checkpointId: id } },
-  })
   await prisma.checkpointProgress.upsert({
     where: { userId_checkpointId: { userId: user.id, checkpointId: id } },
     create: { userId: user.id, checkpointId: id, status },
     update: { status },
   })
-  if (status === 'COMPLETED' && before?.status !== 'COMPLETED') {
-    await track({ event: 'checkpoint_completed', userId: user.id, path: id })
-  }
+  if (status === 'COMPLETED') await recordCheckpointCompleted(user.id, id)
   const lessonProgress = await syncLessonFromCheckpoints(
     user.id,
     lesson.id,

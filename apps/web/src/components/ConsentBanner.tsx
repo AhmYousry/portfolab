@@ -45,9 +45,9 @@ export function ConsentBanner() {
       className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-2xl rounded-2xl border border-line-2 bg-ink-2/95 p-5 shadow-2xl backdrop-blur"
     >
       <p className="mb-3 text-sm leading-7 text-paper/90">
-        بنستخدم PostHog لتحليلات استخدام مجهولة الهوية (الصفحات والأزرار اللي بتتستخدم) عشان نحسن
-        Portfolab. مش بنبعت إيميلك أو اسمك أو كلمة المرور أو بيانات الدفع. تقدر ترفض والموقع هيشتغل
-        عادي. التفاصيل في{' '}
+        بنستخدم PostHog عشان نعرف الصفحات والأزرار اللي بتتستخدم ونحسن Portfolab. لو مسجل دخول،
+        بنربط الأحداث بمعرّف داخلي لحسابك (مش إيميلك ولا اسمك). مش بنبعت كلمة المرور ولا أي بيانات
+        دفع ولا اللي بتكتبه في الحقول. تقدر ترفض والموقع هيشتغل عادي. التفاصيل في{' '}
         <Link to="/privacy" className="text-amber-2 underline">
           سياسة الخصوصية
         </Link>
@@ -66,14 +66,18 @@ export function ConsentBanner() {
         </span>
       </label>
       <div className="flex flex-wrap gap-3">
-        <Button onClick={() => choose(true)} className="px-4 py-2" data-attr="consent-accept">
+        <Button
+          onClick={() => choose(true)}
+          className="px-4 py-2"
+          data-analytics-id="consent-accept"
+        >
           موافق
         </Button>
         <Button
           variant="ghost"
           onClick={() => choose(false)}
           className="px-4 py-2"
-          data-attr="consent-decline"
+          data-analytics-id="consent-decline"
         >
           لأ، شكرًا
         </Button>

@@ -7,6 +7,7 @@ import { prisma } from '../db.js'
 import { env } from '../env.js'
 import { errors, ok, param, parse, requireUser } from '../http.js'
 import { resourceAccess } from '../services/access.js'
+import { captureForUser } from '../services/product-analytics.js'
 
 const ZIP_SKIP_DIRS = new Set(['node_modules', 'dist', 'coverage', '.git'])
 const ENV_FILE = /^\.env(\..+)?$/
@@ -53,6 +54,7 @@ resourcesRouter.get('/resources', async (req, res) => {
       const access = await resourceAccess(r, user)
       return {
         id: r.id,
+        key: r.key,
         title: r.title,
         description: r.description,
         type: r.type,
@@ -74,6 +76,15 @@ resourcesRouter.get('/resources/:id/download', async (req, res) => {
 
   const access = await resourceAccess(resource, user)
   if (!access.allowed) throw errors.forbidden(LOCK_REASONS[access.reason ?? 'TIER'])
+
+  const project = resource.projectId
+    ? await prisma.project.findUnique({ where: { id: resource.projectId }, select: { slug: true } })
+    : null
+  await captureForUser(user.id, 'resource_downloaded', {
+    resource_id: resource.key,
+    project_id: project?.slug,
+    plan: resource.tier === 'PRO' ? 'pro' : 'free',
+  })
 
   const repoRoot = path.resolve(env.contentDir, '..')
   res.setHeader('Cache-Control', 'private, no-store')

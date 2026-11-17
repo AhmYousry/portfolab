@@ -28,7 +28,7 @@ No personal API key (`phx_…`) is needed by the app. Never put a personal API k
 - **Single entry point:** `apps/web/src/lib/analytics.ts` (`analytics.capture / pageview / identify / reset`) and `apps/api/src/services/product-analytics.ts` (`captureForUser`). No other file imports PostHog.
 - **Consent first:** the PostHog SDK is not even downloaded until the visitor clicks "موافق" in the banner. Revoking calls `reset()` **then** `opt_out_capturing()` (in posthog-js, `reset()` clears a previous opt-out, so the order matters). The SDK instance is kept, and re-granting calls `opt_in_capturing()`, re-identifies the current user and sends a `$pageview` for the current page. A persisted opt-out is cleared at init when consent is granted. On `/checkout/status` every query parameter except `purchase` is removed from URLs before sending, and from the address bar. Logged-in users' choice is stored server-side (`User.analyticsConsent`); the API only sends server events for users who consented.
 - **Pageviews:** manual `$pageview` on every SPA route change (`useAnalyticsRouting` in `Layout`).
-- **Autocapture:** clicks/submits/changes on `a`, `button`, `form`, `select`, `label`. Important elements carry stable `data-attr` ids (below). Auth, checkout and account forms have `ph-no-capture`.
+- **Autocapture:** clicks/submits/changes on `a`, `button`, `form`, `select`, `label`, checkbox inputs and anything with `data-analytics-id`. Auth, checkout and onboarding forms have `ph-no-capture`; their conversions are tracked explicitly (`button_clicked`, `*_failed`, `*_completed`).
 - **Identity:** `identify(user.id, { role, plan })` — internal cuid only, never email/name. `reset()` on logout. `person_profiles: 'identified_only'`.
 - **Attribution:** `utm_*` captured from the URL on landing and registered as super properties (`utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `campaign`) plus `device_type`.
 - **Scrubbing:** `before_send` redacts `token`, `hmac`, `clientSecret`, `client_secret`, `secret`, `code` query params from `$current_url`, `$referrer` and initial URL properties. All custom properties go through an allowlist (`sanitizeProperties` in `packages/shared/src/analytics.ts`); any value that looks like an email is dropped.
@@ -37,27 +37,38 @@ No personal API key (`phx_…`) is needed by the app. Never put a personal API k
 
 ## 4. Event catalog
 
-| Event | Emitted by | When | Properties |
-|---|---|---|---|
-| `$pageview` | web | each route change | `path`, super props |
-| `$autocapture` | web (SDK) | clicks/submits on allowlisted elements | SDK defaults + `data-attr` |
-| `signup_completed` | web | signup API succeeded | `source` |
-| `login_completed` | web | login API succeeded | `source` |
-| `free_project_started` | **api** | first enrollment in a FREE project | `project_id`, `source` |
-| `lesson_started` | web | first open of a lesson (no progress yet) | `project_id`, `lesson_id` |
-| `lesson_completed` | **api** | lesson progress transitions to COMPLETED | `project_id`, `lesson_id` |
-| `prompt_copied` | web | copy button on a `text` block (AI prompts) | `project_id`, `lesson_id`, `feature_name` |
-| `project_completed` | **api** | all published lessons completed (once per user/project) | `project_id`, `plan` |
-| `pro_page_viewed` | web | `/pricing`, `/checkout`, any Pro project page | `source` |
-| `checkout_started` | **api** | Paymob intention created | `plan`, `source`, `amount_egp` |
-| `checkout_failed` | api + web | api: intention error / declined payment webhook; web: client-side errors other than 502 | `plan`, `source`, `reason` |
-| `purchase_completed` | **api only** | verified Paymob success, deduped by `Purchase.analyticsCapturedAt` | `plan`, `amount_egp`, `currency`, `provider`, `purchase_id` |
-| `feature_used` | web | `code_copied`, `spoiler_revealed` | `feature_name`, `source` |
-| `client_error` | web | `window.onerror` / unhandled rejection | `reason`, `feature_name` |
+Typed contract: `ProductEventMap` in `packages/shared/src/analytics.ts`. "Once" means atomically deduplicated per user + subject by the `AnalyticsClaim` table (never purged).
 
-All events carry `device_type`. Server events carry `app: 'api'`, web events `app: 'web'`. `project_id`/`lesson_id` are slugs.
+| Event | Emitted by | When | Properties | Repeats? |
+|---|---|---|---|---|
+| `$pageview` | web | each route change; the current page is (re)sent once when consent is granted | `path`, super props | per navigation |
+| `$autocapture` | web (SDK) | clicks/submits on `a`, `button`, `form`, `select`, `label`, `input[type=checkbox]`, `[data-analytics-id]`; never inside `.ph-no-capture` | SDK defaults incl. `attr__data-analytics-id` | yes |
+| `button_clicked` | web | every tracked control (see ids below); submit buttons tracked in `onSubmit` (covers Enter) | `analytics_id`, `path`, optional `project_id`, `lesson_id`, `resource_id` | yes |
+| `signup_completed` / `login_completed` | web | auth API success | `source` | per signup / login |
+| `signup_failed` / `login_failed` | web | auth API error or client validation | `reason` = API error code or `client_validation` (never input) | yes |
+| `logged_out` | web | logout, before identity reset | `source` | yes |
+| `onboarding_completed` | web | onboarding saved or skipped | `source` (`saved`/`skipped`) | per visit |
+| `free_project_started` / `pro_project_started` | **api** | first enrollment | `project_id`, `source` | **once** |
+| `lesson_previewed` | web | anonymous visitor opens a preview lesson | `project_id`, `lesson_id` | per mount |
+| `lesson_started` | **api** | first non-NOT_STARTED progress | `project_id`, `lesson_id` | **once** |
+| `lesson_completed` | **api** | first COMPLETED progress | `project_id`, `lesson_id` | **once** |
+| `checkpoint_completed` | **api** | first completion of a checkpoint | `project_id`, `lesson_id`, `checkpoint_id` (key) | **once** |
+| `project_completed` | **api** | all published lessons completed | `project_id`, `plan` | **once** |
+| `prompt_copied` | web | copy on a block tagged ```` ```text prompt=F0x ```` | `project_id`, `lesson_id`, `prompt_id`, `feature_name` | yes |
+| `feature_used` | web | `code_copied` (untagged block), `spoiler_revealed` | `feature_name`, `source` | yes |
+| `resource_downloaded` | **api** | authorized download served | `resource_id` (stable key), `project_id`, `plan` | yes (every download) |
+| `pro_page_viewed` | web | `/pricing`, open `/checkout` (not for Pro owners), Pro project page; held in memory before a consent decision and sent only if consent is granted on that page | `source` | per view |
+| `checkout_started` | **api** | Paymob intention created | `plan`, `source`, `amount_egp` | per attempt |
+| `checkout_failed` | api + web | api: intention error / declined webhook; web: client errors except 502 | `plan`, `source`, `reason` | yes |
+| `purchase_completed` | **api only** | verified payment; `$set plan=pro`; flushed immediately | `plan`, `amount_egp`, `currency`, `provider`, `purchase_id` | **once** (`Purchase.analyticsCapturedAt`) |
+| `purchase_refunded` | **api only** | refund/void processed; `$set plan` recomputed; flushed immediately | same as purchase | **once** |
+| `client_error` | web | `window.onerror` / unhandled rejection; text sanitized (URL queries, emails, card-like numbers, tokens) | `reason`, `feature_name` | yes |
 
-Stable `data-attr` ids: `nav-logo`, `hero-free-cta`, `pricing-free-cta`, `pricing-pro-cta`, `project-start`, `checkpoint-toggle`, `code-copy`, `code-spoiler-toggle`, `checkout-pay`, `checkout-retry`, `consent-accept`, `consent-decline`, `footer-privacy-settings`.
+All events carry `device_type`. Server events carry `app: 'api'`, web events `app: 'web'`. Identify sends `$set` `role`, `plan` and `$set_once` `initial_utm_*`. First-party `LeadEvent` names (`signup_complete`, `project_enrolled`, `lesson_started`, `checkpoint_completed`, `free_project_completed`, …) are a separate admin-only store; `lesson_started` and `checkpoint_completed` are now written once, by the server only.
+
+Stable ids (`data-analytics-id` / `analytics_id`), registry `ANALYTICS_IDS` in `packages/shared/src/analytics.ts` (a unit test fails if the UI uses an unregistered id): navigation `nav-*`, footer `footer-*`, landing `hero-free-cta`, `hero-preview-lesson`, `landing-curriculum-link`, pricing `pricing-free-cta`, `pricing-pro-cta`, projects `project-card`, `project-start`, `project-signup-cta`, `project-lesson-link`, dashboard `dashboard-continue`, `dashboard-start-taskflow`, `progress-lesson-link`, lessons `lesson-prev`, `lesson-next`, `lesson-breadcrumb-project`, `lesson-locked-signup`, `lesson-locked-login`, `lesson-pro-pricing`, `code-copy`, `code-spoiler-toggle`, `checkpoint-toggle`, `resource-download`, auth `signup-submit`, `login-submit`, `forgot-password-submit`, `reset-password-submit`, onboarding `onboarding-save`, `onboarding-skip`, checkout `checkout-pay`, `checkout-retry`, `checkout-dashboard`, consent `consent-accept`, `consent-decline`.
+
+**Ranking buttons:** use a Trends insight on `button_clicked` broken down by `analytics_id` (not `$autocapture`, which also fires for the same clicks and is kept only for heatmaps/toolbar).
 
 ## 5. Dashboards to create (manual)
 
@@ -71,7 +82,8 @@ Create each as a PostHog dashboard; insights are listed with their exact configu
 - Trends: `signup_completed` breakdown by `utm_campaign` (campaign → signup attribution).
 
 ### 2. Most Used Features & Buttons
-- Trends: `$autocapture` where `event type = click`, breakdown by **element attribute `data-attr`**, top 20.
+- Trends: `button_clicked`, breakdown by `analytics_id`, top 30 (the reliable button ranking).
+- Trends: `button_clicked` where `analytics_id` in (`hero-free-cta`, `pricing-free-cta`, `pricing-pro-cta`, `project-start`, `dashboard-continue`, `checkout-pay`), breakdown by `analytics_id`.
 - Trends: `feature_used` breakdown by `feature_name`.
 - Trends: `prompt_copied` breakdown by `lesson_id`.
 - Trends: `$pageview` breakdown by `path`, top 20.

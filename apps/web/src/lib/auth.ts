@@ -1,10 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { PublicUser } from '@pb/shared'
+import { useEffect, useRef } from 'react'
 import { analytics } from './analytics'
 import { api } from './api'
-import { getConsent } from './consent'
+import { type ConsentState, getConsent } from './consent'
 
 export const ME_KEY = ['me'] as const
+const SYNC_ATTEMPTS = 3
+const SYNC_BACKOFF_MS = 1500
 
 export function useMe() {
   return useQuery({
@@ -14,12 +17,42 @@ export function useMe() {
   })
 }
 
-export async function syncConsentToServer() {
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+export async function syncConsentToServer(attempts = SYNC_ATTEMPTS): Promise<boolean> {
   const consent = getConsent()
-  if (!consent) return
-  await api
-    .put('/api/me/analytics-consent', { analytics: consent.analytics })
-    .catch(() => undefined)
+  if (!consent) return false
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await api.put('/api/me/analytics-consent', { analytics: consent.analytics })
+      return true
+    } catch {
+      if (attempt < attempts) await wait(SYNC_BACKOFF_MS * attempt)
+    }
+  }
+  return false
+}
+
+// The decision made on this device is authoritative for this device; the server flag mirrors the
+// most recent decision so server-side events respect it. Re-sync whenever they disagree.
+export function consentNeedsSync(local: ConsentState | null, user: PublicUser | null | undefined) {
+  return Boolean(local && user && local.analytics !== user.analyticsConsent)
+}
+
+export function useConsentServerSync(user: PublicUser | null | undefined) {
+  const qc = useQueryClient()
+  const syncedFor = useRef<string | null>(null)
+  useEffect(() => {
+    const local = getConsent()
+    if (!user || !consentNeedsSync(local, user)) return
+    const key = `${user.id}:${String(local?.analytics)}`
+    if (syncedFor.current === key) return
+    syncedFor.current = key
+    void syncConsentToServer().then((ok) => {
+      if (ok && local)
+        qc.setQueryData<PublicUser | null>(ME_KEY, { ...user, analyticsConsent: local.analytics })
+    })
+  }, [user, qc])
 }
 
 export function useAuthActions() {
@@ -35,6 +68,7 @@ export function useAuthActions() {
     },
     logout: async () => {
       await api.post('/api/auth/logout')
+      analytics.capture('logged_out', { source: 'nav' })
       analytics.reset()
       qc.setQueryData(ME_KEY, null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' && q.queryKey[0] !== 'public' })
