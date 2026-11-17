@@ -115,7 +115,10 @@ test('student: signup → enroll → checkpoint → progress survives logout/log
   await expect(page).toHaveURL(/lessons\/why-taskflow/)
 
   const checkpoint = page.getByRole('checkbox', { name: /كتبت 5 user stories/ })
-  await checkpoint.check()
+  // Controlled input: the optimistic update lands after an awaited cancelQueries, so .check()'s
+  // immediate state assertion races it. Click, then wait for the checked state.
+  await checkpoint.click()
+  await expect(checkpoint).toBeChecked()
   await expect(page.getByText('1 من 2')).toBeVisible()
 
   await page.getByRole('button', { name: 'تسجيل الخروج' }).click()

@@ -48,9 +48,19 @@ function toEvents(body: string): CapturedEvent[] {
 
 async function interceptPosthog(page: Page): Promise<Capture> {
   const capture: Capture = { events: [], rawBodies: [], requests: [] }
-  // posthog-js treats navigator.webdriver === true (any automated browser) as a bot and drops events.
+  // posthog-js drops events as bot traffic when navigator.webdriver is true or a
+  // userAgentData brand says "HeadlessChrome" (Playwright's bundled headless shell in CI).
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })
+    const UAData = (globalThis as { NavigatorUAData?: { prototype: object } }).NavigatorUAData
+    if (UAData) {
+      const brands = [
+        { brand: 'Chromium', version: '130' },
+        { brand: 'Google Chrome', version: '130' },
+        { brand: 'Not?A_Brand', version: '99' },
+      ]
+      Object.defineProperty(UAData.prototype, 'brands', { get: () => brands })
+    }
   })
   await page.route(`${FAKE_HOST}/**`, async (route) => {
     const request = route.request()
