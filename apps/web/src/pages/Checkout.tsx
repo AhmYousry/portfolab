@@ -42,6 +42,10 @@ export function Checkout() {
         source: 'checkout_page',
       }),
     onSuccess: ({ checkoutUrl }) => {
+      analytics.capture('feature_used', {
+        feature_name: 'checkout_redirect_started',
+        source: 'checkout_page',
+      })
       window.location.assign(checkoutUrl)
     },
     onError: (error) => {

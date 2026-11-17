@@ -20,6 +20,10 @@ export function ProjectPage() {
   const enroll = useMutation({
     mutationFn: () => api.post(`/api/projects/${slug}/enroll`),
     onSuccess: () => {
+      analytics.capture('feature_used', {
+        feature_name: 'project_enrollment_completed',
+        source: slug,
+      })
       void qc.invalidateQueries({ queryKey: ['dashboard'] })
       const first = project?.modules[0]?.lessons[0]
       navigate(first ? `/projects/${slug}/lessons/${first.slug}` : '/dashboard')

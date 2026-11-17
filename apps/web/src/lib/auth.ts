@@ -29,12 +29,14 @@ export function useAuthActions() {
     signedIn: (user: PublicUser, method: 'signup' | 'login', source: string) => {
       qc.setQueryData(ME_KEY, user)
       analytics.identify(user)
+      analytics.log('info', 'authentication_completed', { authentication_method: method })
       if (method === 'signup') analytics.capture('signup_completed', { source })
       else analytics.capture('login_completed', { source })
       void syncConsentToServer()
     },
     logout: async () => {
       await api.post('/api/auth/logout')
+      analytics.log('info', 'session_logout_completed')
       analytics.reset()
       qc.setQueryData(ME_KEY, null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' && q.queryKey[0] !== 'public' })

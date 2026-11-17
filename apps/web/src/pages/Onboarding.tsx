@@ -6,6 +6,7 @@ import { safeNext } from '../components/Guards'
 import { Container } from '../components/Layout'
 import { Button, Card, Select } from '../components/ui'
 import { api, errorMessage } from '../lib/api'
+import { analytics } from '../lib/analytics'
 import { useAuthActions } from '../lib/auth'
 
 const EXPERIENCE = [
@@ -42,6 +43,10 @@ export function Onboarding() {
         goal: values.goal || null,
       }),
     onSuccess: ({ user }) => {
+      analytics.capture('feature_used', {
+        feature_name: 'onboarding_completed',
+        source: 'onboarding',
+      })
       setUser(user)
       navigate(next, { replace: true })
     },
@@ -54,6 +59,14 @@ export function Onboarding() {
 
   const update = (key: keyof typeof values) => (e: React.ChangeEvent<HTMLSelectElement>) =>
     setValues((v) => ({ ...v, [key]: e.target.value }))
+
+  function skip() {
+    analytics.capture('feature_used', {
+      feature_name: 'onboarding_skipped',
+      source: 'onboarding',
+    })
+    navigate(next, { replace: true })
+  }
 
   return (
     <Container className="max-w-lg">
@@ -83,7 +96,7 @@ export function Onboarding() {
             <Button type="submit" loading={save.isPending}>
               احفظ وكمّل
             </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate(next, { replace: true })}>
+            <Button type="button" variant="ghost" onClick={skip}>
               تخطى
             </Button>
           </div>
