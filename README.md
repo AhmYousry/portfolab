@@ -102,3 +102,6 @@ Live payments (Paymob is integrated but sandbox-only and gated), real email deli
 | API tests fail on connect | The `portfolio_builder_test` DB is created on first container init; if your volume predates that, run `docker compose exec db createdb -U pb portfolio_builder_test` |
 | Port 5432 busy | Stop the other Postgres or change the port mapping and `DATABASE_URL` |
 | Password reset email never arrives | Expected: no email provider yet. In development the link is printed in the API console |
+| Windows PowerShell: `pnpm.ps1 cannot be loaded` (script execution disabled) | Run `pnpm.cmd` instead of `pnpm`, enable scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or run commands in WSL2 / Git Bash |
+| Windows PowerShell: `cp` or `&&` setup commands fail | Use `Copy-Item apps/api/.env.example apps/api/.env` and `;` instead of `&&`, or run the setup commands in WSL2 / Git Bash |
+| Windows: `docker compose up -d db` fails to start or connect | Start Docker Desktop and ensure the WSL2 (Linux containers) backend is running before `docker compose up -d db` |
