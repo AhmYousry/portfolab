@@ -10,6 +10,9 @@ export const ORIGIN = 'http://localhost:5173'
 export const PASSWORD = 'correct-horse-battery'
 
 const TABLES = [
+  'ReauthGrant',
+  'OAuthAttempt',
+  'OAuthIdentity',
   'AnalyticsClaim',
   'AuditLog',
   'LeadEvent',

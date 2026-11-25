@@ -12,11 +12,13 @@ import {
 } from '../components/ui'
 import { trackClick } from '../lib/analytics'
 import { useMe } from '../lib/auth'
+import { isFreeLaunch, visibleByTier } from '../lib/launch'
 import { useDashboard, useProgress, useResources } from '../lib/queries'
 
 export function Dashboard() {
   const { data: user } = useMe()
   const { data, isLoading, isError, refetch } = useDashboard()
+  const projects = data?.projects.filter((p) => !isFreeLaunch() || p.project.tier === 'FREE') ?? []
 
   return (
     <Container>
@@ -25,7 +27,7 @@ export function Dashboard() {
       </div>
       {isLoading && <Loading />}
       {isError && <ErrorState message="مش قادرين نحمل لوحتك." onRetry={() => refetch()} />}
-      {data && data.projects.length === 0 && (
+      {data && projects.length === 0 && (
         <Card className="max-w-2xl">
           <h2 className="mb-2 text-xl font-bold">لسه مبدأتش مشروع</h2>
           <p className="mb-6 text-muted">
@@ -41,7 +43,7 @@ export function Dashboard() {
         </Card>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
-        {data?.projects.map((p) => (
+        {projects.map((p) => (
           <Card key={p.project.slug}>
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -92,7 +94,8 @@ const STATUS_ICON = {
 } as const
 
 export function Progress() {
-  const { data, isLoading, isError, refetch } = useProgress()
+  const { data: allProgress, isLoading, isError, refetch } = useProgress()
+  const data = allProgress?.filter((p) => !isFreeLaunch() || p.project.tier === 'FREE')
 
   return (
     <Container className="max-w-3xl">
@@ -164,7 +167,7 @@ export function Resources() {
       {isLoading && <Loading />}
       {isError && <ErrorState message="مش قادرين نحمل الملفات." onRetry={() => refetch()} />}
       <ul className="space-y-4">
-        {data?.map((r) => (
+        {visibleByTier(data ?? []).map((r) => (
           <li key={r.id}>
             <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex gap-4">

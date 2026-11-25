@@ -1,8 +1,34 @@
 # Implementation status — Portfolab
 
-Last updated: 2026-11-15 (Portfolab upgrade: rebrand + PostHog + Paymob)
+Last updated: 2026-11-25 (zero-budget beta preparation)
 
-## Summary
+## Zero-budget beta
+
+The Render Free deployment uses one Node web service for the API and built React app, with Neon Free for persistent data. `AUTH_MODE=social` enables Google/GitHub signup and login, disables password and reset endpoints, and starts without a mail provider. Deletion uses linked-provider reauthentication followed by an explicit confirmation and a short-lived, single-use grant bound to the original session. The existing password mode remains the default for other deployments.
+
+Setup instructions are in [deploy/RENDER_FREE.md](deploy/RENDER_FREE.md), including an Egyptian Arabic quick-start for an owner with only a GitHub account. `render.yaml` passed validation against Render's published JSON schema and selects one Free service.
+
+Executed locally on 2026-11-25:
+
+- API suite: 267 tests passed across 16 files.
+- Web suite: 61 tests passed. Shared schemas: 7 tests passed.
+- Render build, typecheck, lint, formatting, and migration deployment passed.
+- Production-mode HTTPS browser checks passed for the social-only UI, privacy consent, authorization start, lesson deep links, API JSON 404, enrollment, persisted checkpoints, starter ZIP download, and final account deletion. Provider navigation was intercepted, and the final deletion grant was synthetic. OAuth exchanges and identity verification were tested with mocks.
+- Browser checks also passed for capabilities-request failures across signup, login, recovery, and account settings.
+
+Website hosting and real provider callbacks are pending. Neon Free is now connected; the owner still needs a Render account and at least one OAuth client pair. Hosting regions and the remaining legal draft text need final review after account setup.
+
+## Live Neon verification (2026-11-25)
+
+Neon CLI initialized the requested project `gentle-recipe-76904760`, branch `production`, in organization `org-lively-mode-74750072`. Deployment utilized Postgres only and pulled the connection variables into ignored `.env.local`. The organization plan was verified as Free.
+
+The existing Prisma driver uses the pooled runtime URL. Migration deployment uses the direct connection through `DATABASE_URL_UNPOOLED` (or the existing `DIRECT_DATABASE_URL` alias). All six migrations were applied and course content imported. A subsequent `pnpm neon:migrate` reported no pending migrations.
+
+Validation passed: exact `npm run build`, typecheck, lint, formatting, 14 isolated environment/migration safety tests, and a check that the web build contains no Neon credentials. Playwright uses `dev:local` and refuses to reuse an existing API server, preventing normal test setup from connecting to the root Neon environment.
+
+A local browser run against actual Neon verified signup/session persistence, onboarding, enrollment, checkpoint persistence after reload and relogin, authenticated starter download, and account deletion/session revocation. The synthetic account and associated user rows were cleaned up. This run used temporary local password mode; real Google/GitHub callbacks remain unverified and the social-only hosting configuration is unchanged. An initial browser run timed out because it navigated before logout completed; awaiting the logout response resolved the test timing issue and the full rerun passed.
+
+## Earlier product summary (2026-11-15)
 
 The Free MVP (platform + TaskFlow Lite) is implemented and tested locally. The upgrade added the **Portfolab** brand, **PostHog** product analytics (consent-gated, typed, server + client), and a **Paymob** checkout integration that is complete in code and tested against a mocked Paymob API, but **sandbox-only and closed** until you provide credentials, publish a Pro project, and approve going live.
 
@@ -50,7 +76,7 @@ The Free MVP (platform + TaskFlow Lite) is implemented and tested locally. The u
 | PostHog project + dashboards | Create project, set keys, create the 7 dashboards from `docs/analytics/posthog-setup.md` §5, set retention | D-022 |
 | Paymob sandbox run | Merchant account, test integration IDs, keys, HMAC secret, public `API_PUBLIC_URL`; run the sandbox checklist | `docs/payments/paymob.md` |
 | Live payments | Explicit approval + `PAYMOB_ALLOW_LIVE=true` + a PUBLISHED Pro project + final refund/terms | D-027 |
-| Email delivery | Choose provider (template is ready) | D-009 |
+| Email delivery | Resend adapter is implemented. Create a Resend account, verify a sending domain (SPF/DKIM DNS), create a sending-only API key, set `RESEND_API_KEY` + `EMAIL_FROM` in the production host env | D-009 |
 | Legal pages | Business identity, support email, refund terms, PostHog region/retention values | D-015 |
 | Deployment | Hosting provider/budget | spec Part C |
 | Content review | Human review of lessons | spec §11 |

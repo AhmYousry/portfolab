@@ -45,7 +45,19 @@ export function passwordResetEmail(link: string): EmailMessage {
   }
 }
 
-class ConsoleMailer implements Mailer {
+export type MailFailureReason = 'timeout' | 'network' | 'http' | 'unknown'
+
+export class MailDeliveryError extends Error {
+  constructor(
+    readonly reason: Exclude<MailFailureReason, 'unknown'>,
+    readonly status?: number,
+  ) {
+    super(`email delivery failed: ${reason}${status === undefined ? '' : ` (HTTP ${status})`}`)
+    this.name = 'MailDeliveryError'
+  }
+}
+
+export class ConsoleMailer implements Mailer {
   async sendPasswordReset(_to: string, link: string) {
     if (process.env.NODE_ENV === 'production') {
       console.warn('[mailer] No email provider configured; password reset email NOT sent.')
@@ -57,8 +69,47 @@ class ConsoleMailer implements Mailer {
   }
 }
 
+export class MailUnavailableError extends Error {
+  constructor() {
+    super('email delivery is unavailable in this auth mode')
+    this.name = 'MailUnavailableError'
+  }
+}
+
+// Social-only mode has no mail provider. Anything that tries to send fails loudly instead of
+// silently pretending (no console fallback).
+export class UnavailableMailer implements Mailer {
+  async sendPasswordReset(): Promise<void> {
+    throw new MailUnavailableError()
+  }
+}
+
 export let mailer: Mailer = new ConsoleMailer()
 
 export function setMailer(m: Mailer) {
   mailer = m
+}
+
+const inFlight = new Set<Promise<void>>()
+
+function describeFailure(err: unknown): { reason: MailFailureReason; status?: number } {
+  if (!(err instanceof MailDeliveryError)) return { reason: 'unknown' }
+  if (err.status === undefined) return { reason: err.reason }
+  return { reason: err.reason, status: err.status }
+}
+
+export function dispatchPasswordReset(to: string, link: string): void {
+  const task = Promise.resolve()
+    .then(() => mailer.sendPasswordReset(to, link))
+    .catch((err: unknown) => {
+      console.error('[mailer] password reset delivery failed', describeFailure(err))
+    })
+    .finally(() => {
+      inFlight.delete(task)
+    })
+  inFlight.add(task)
+}
+
+export async function drainMailDeliveries(): Promise<void> {
+  await Promise.all([...inFlight])
 }

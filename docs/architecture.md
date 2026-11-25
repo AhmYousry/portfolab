@@ -47,7 +47,13 @@ In production the web app is static files; the API is a separate service. `/api/
 - Expiry: 7 days absolute (`SESSION_TTL_DAYS`). Login creates a new session (rotation). Logout revokes. Password reset and password change revoke all sessions.
 - CSRF: signed double-submit cookie. `GET /api/auth/csrf` sets `pb_csrf` (readable, HMAC-signed) and returns the token; every non-GET request must echo it in `X-CSRF-Token`. Plus `Origin` must be in `CORS_ORIGINS` when present.
 - Rate limits (in-memory, per IP): auth endpoints, password reset, analytics ingest.
-- Password reset: hashed single-use token, 30 min expiry. Delivery goes through a `Mailer` interface; only `ConsoleMailer` exists (dev logs the link). **No real email provider is integrated.**
+- Password reset: hashed single-use token, 30 min expiry. Consumption is an atomic conditional update (`usedAt IS NULL AND expiresAt > now`) inside the password-change transaction, so concurrent requests with one token cannot both succeed.
+- Reset email delivery goes through the `Mailer` interface (`apps/api/src/services/mailer.ts`), Arabic RTL template:
+  - `ConsoleMailer` (default in development/test): no network, no credentials; dev prints the link, test is silent.
+  - `ResendMailer` (`services/resend-mailer.ts`): native `fetch` `POST https://api.resend.com/emails`, `Authorization: Bearer`, body `from/to/subject/text/html`, 10 s timeout (`AbortSignal.timeout`), redirects refused. Errors carry only a class (`timeout`/`network`/`http`) and HTTP status — never the response body, recipient, link or key.
+  - Selection: `MAIL_PROVIDER` (`console`|`resend`), default `resend` in production and `console` elsewhere. Credentials alone never switch dev/E2E to Resend. Validated once at server startup (`server.ts`); production exits if the provider is `console`, `RESEND_API_KEY` is missing/not `re_...`, or `EMAIL_FROM` is missing/malformed/on `resend.dev` or a reserved test domain. Error output names the variable only. Scripts that import `env.ts` are unaffected.
+  - `forgot-password` creates the token synchronously, then dispatches delivery without awaiting it, so response body, status and latency do not depend on whether the account exists or the provider succeeds. Failures log `[mailer] password reset delivery failed {reason, status}` only. In-flight deliveries are drained on SIGTERM/SIGINT.
+  - Prerequisite: the `EMAIL_FROM` domain must be verified in Resend (SPF + DKIM DNS records) before production; otherwise Resend returns 403 and users receive nothing while the API still answers 200.
 
 ## Authorization & entitlements
 

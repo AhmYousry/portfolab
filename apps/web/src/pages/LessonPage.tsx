@@ -9,8 +9,10 @@ import { Badge, ButtonLink, Card, ErrorState, Loading, Notice, TrackedLink } fro
 import { ApiRequestError, api, errorMessage } from '../lib/api'
 import { analytics, trackClick } from '../lib/analytics'
 import { useMe } from '../lib/auth'
+import { FREE_PROJECT_SLUG, isFreeLaunch } from '../lib/launch'
 import { useLesson } from '../lib/queries'
 import { usePageTitle } from '../lib/seo'
+import { UnavailableInBeta } from './ProjectPage'
 
 function InlineCode({ text }: { text: string }) {
   return (
@@ -172,6 +174,8 @@ export function LessonPage() {
   if (meLoading || isLoading) return <Loading />
   if (isError) {
     const status = error instanceof ApiRequestError ? error.status : 0
+    const outsideBeta = slug !== FREE_PROJECT_SLUG && (status === 401 || status === 404)
+    if (isFreeLaunch() && (status === 403 || outsideBeta)) return <UnavailableInBeta />
     if (status === 401) {
       return (
         <Container className="max-w-xl text-center">

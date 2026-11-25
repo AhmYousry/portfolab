@@ -1,0 +1,49 @@
+# Zero-cost beta: one Render Free web service (API + built React app, same origin) + Neon Free.
+# No paid plan, disk, cron, worker, Render Postgres, or preDeployCommand. See deploy/RENDER_FREE.md.
+services:
+  - type: web
+    name: portfolab
+    runtime: node
+    plan: free
+    branch: main
+    autoDeploy: false
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm run render:build
+    startCommand: node apps/api/scripts/render-start.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_MODE
+        value: social
+      - key: WEB_DIST_DIR
+        value: ../web/dist
+      - key: CONTENT_DIR
+        value: ../../content
+      - key: CHECKOUT_ENABLED
+        value: 'false'
+      - key: CHECKPOINT_DISABLE
+        value: '1'
+      - key: SESSION_TTL_DAYS
+        value: '7'
+      - key: SESSION_SECRET
+        generateValue: true
+      # Web build flags (read at build time).
+      - key: VITE_FREE_LAUNCH
+        value: 'true'
+      - key: VITE_POSTHOG_REPLAY_ENABLED
+        value: 'false'
+      # Owner-supplied in the Render dashboard. Never commit values.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false

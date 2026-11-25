@@ -12,9 +12,19 @@ export async function purgeExpiredAnalytics(now = new Date()) {
   return { leadEvents: leadEvents.count, webhookEvents: webhookEvents.count, cutoff }
 }
 
+export async function purgeExpiredOAuthAttempts(now = new Date()) {
+  const cutoff = new Date(now.getTime() - DAY_MS)
+  const attempts = await prisma.oAuthAttempt.deleteMany({ where: { expiresAt: { lt: cutoff } } })
+  const grants = await prisma.reauthGrant.deleteMany({ where: { expiresAt: { lt: cutoff } } })
+  return attempts.count + grants.count
+}
+
 // Runs once shortly after boot and then daily. The timer is unref'd so it never keeps the process alive.
 export function scheduleRetention(intervalMs = DAY_MS, firstRunDelayMs = 60_000) {
   const run = () => {
+    purgeExpiredOAuthAttempts().catch(() =>
+      console.warn('[retention] oauth attempt purge failed; will retry next interval'),
+    )
     purgeExpiredAnalytics()
       .then((r) => {
         if (r.leadEvents || r.webhookEvents) {

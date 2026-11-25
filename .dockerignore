@@ -1,0 +1,57 @@
+# Deny by default. Only what deploy/Dockerfile builds from is allowed in.
+*
+
+# Workspace root
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+
+# Workspace packages
+!packages/config/package.json
+!packages/config/tsconfig.base.json
+!packages/shared/package.json
+!packages/shared/tsconfig.json
+!packages/shared/src
+
+# API
+!apps/api/package.json
+!apps/api/tsconfig.json
+!apps/api/tsup.config.ts
+!apps/api/prisma
+!apps/api/src
+
+# Web
+!apps/web/package.json
+!apps/web/tsconfig.json
+!apps/web/vite.config.ts
+!apps/web/index.html
+!apps/web/public
+!apps/web/src
+
+# Course content + downloadable TaskFlow Lite repos
+!content
+!examples/taskflow-lite/starter
+!examples/taskflow-lite/reference
+
+# Deploy
+!deploy/Caddyfile
+!deploy/Dockerfile
+
+# Re-exclude inside allowed paths: deps, build output, local env, logs, test artifacts
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+**/*.log
+**/.DS_Store
+**/test-results
+**/playwright-report
+**/.env
+**/.env.*
+!examples/taskflow-lite/*/server/.env.example
+apps/web/src/test
+apps/*/src/**/*.test.ts
+apps/*/src/**/*.test.tsx
+packages/*/src/**/*.test.ts

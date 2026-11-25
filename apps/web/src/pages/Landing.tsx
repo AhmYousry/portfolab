@@ -14,6 +14,7 @@ import { Badge, ButtonLink, Card, Loading } from '../components/ui'
 import { BRAND } from '@pb/shared'
 import { trackEvent } from '../lib/analytics'
 import { useMe } from '../lib/auth'
+import { isFreeLaunch, visibleCatalog } from '../lib/launch'
 import { useProjects } from '../lib/queries'
 
 const PAINS = [
@@ -71,9 +72,18 @@ const HONEST = [
   'التقديرات الزمنية مبدئية وهنراجعها مع أول دفعة طلاب.',
 ]
 
+const HONEST_FREE_LAUNCH = [
+  'مش bootcamp ومش هنعلمك JavaScript من الصفر. لازم تعرف الأساسيات.',
+  'مفيش ضمان توظيف. اللي بنضمنه إنك هتبني حاجة حقيقية وتفهمها.',
+  'دي نسخة بيتا عامة مجانية: TaskFlow Lite كامل، من غير كارت ومن غير أي دفع.',
+  'التقديرات الزمنية مبدئية وهنراجعها مع أول دفعة طلاب.',
+]
+
 export function Landing() {
   const { data: user } = useMe()
   const { data: projects, isLoading } = useProjects()
+  const freeLaunch = isFreeLaunch()
+  const honest = freeLaunch ? HONEST_FREE_LAUNCH : HONEST
 
   useEffect(() => {
     trackEvent('landing_view', '/')
@@ -164,7 +174,7 @@ export function Landing() {
 
       <Container>
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <h2 className="text-3xl font-bold">المشاريع</h2>
+          <h2 className="text-3xl font-bold">{freeLaunch ? 'المتاح في البيتا' : 'المشاريع'}</h2>
           <ButtonLink
             to="/curriculum"
             variant="quiet"
@@ -178,7 +188,7 @@ export function Landing() {
           <Loading />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {projects?.map((p) => (
+            {visibleCatalog(projects ?? []).map((p) => (
               <ProjectCard key={p.slug} project={p} />
             ))}
           </div>
@@ -189,7 +199,7 @@ export function Landing() {
         <Card className="border-amber/30">
           <h2 className="mb-6 text-2xl font-bold">بصراحة</h2>
           <ul className="space-y-3">
-            {HONEST.map((h) => (
+            {honest.map((h) => (
               <li key={h} className="flex gap-3 leading-7 text-paper/90">
                 <span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-amber" aria-hidden />
                 {h}

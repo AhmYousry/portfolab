@@ -1,19 +1,32 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { PublicUser } from '@pb/shared'
+import type { AuthCapabilities, PublicUser } from '@pb/shared'
 import { useEffect, useRef } from 'react'
 import { analytics } from './analytics'
 import { api } from './api'
 import { type ConsentState, getConsent } from './consent'
 
 export const ME_KEY = ['me'] as const
+export const AUTH_CAPABILITIES_KEY = ['auth-capabilities'] as const
 const SYNC_ATTEMPTS = 3
 const SYNC_BACKOFF_MS = 1500
+const CAPABILITIES_STALE_MS = 5 * 60_000
 
 export function useMe() {
   return useQuery({
     queryKey: ME_KEY,
     queryFn: () => api.get<{ user: PublicUser | null }>('/api/auth/me').then((d) => d.user),
     staleTime: 60_000,
+  })
+}
+
+// Mode + enabled providers, plus the viewer's linked providers when signed in.
+// Keyed by user so a sign-in/out never shows another state's linked providers.
+export function useAuthCapabilities() {
+  const { data: user } = useMe()
+  return useQuery({
+    queryKey: [...AUTH_CAPABILITIES_KEY, user?.id ?? null],
+    queryFn: () => api.get<AuthCapabilities>('/api/auth/oauth/providers'),
+    staleTime: CAPABILITIES_STALE_MS,
   })
 }
 

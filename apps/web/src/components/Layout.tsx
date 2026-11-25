@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { type AnalyticsId, BRAND } from '@pb/shared'
 import { useAuthActions, useConsentServerSync, useMe } from '../lib/auth'
 import { trackClick, useAnalyticsRouting } from '../lib/analytics'
+import { FREE_LAUNCH_BLOCKED_PATHS, isFreeLaunch } from '../lib/launch'
 import { useRouteTitle } from '../lib/seo'
 import { BrandWordmark } from './Brand'
 import { ConsentBanner, openConsentSettings } from './ConsentBanner'
@@ -32,6 +33,12 @@ const FOOTER_LINKS: NavItem[] = [
   { to: '/contact', label: 'تواصل', id: 'footer-contact' },
 ]
 
+const BLOCKED_PATHS: readonly string[] = FREE_LAUNCH_BLOCKED_PATHS
+
+function launchLinks(items: NavItem[]) {
+  return isFreeLaunch() ? items.filter((l) => !BLOCKED_PATHS.includes(l.to)) : items
+}
+
 function navClass({ isActive }: { isActive: boolean }) {
   return `rounded-lg px-3 py-2 text-sm transition ${isActive ? 'text-paper bg-white/5' : 'text-muted hover:text-paper'}`
 }
@@ -55,7 +62,8 @@ export function Layout() {
     setOpen(false)
   }, [location.pathname, location.search])
 
-  const links = [...PUBLIC_LINKS, ...(user ? STUDENT_LINKS : [])]
+  const links = launchLinks([...PUBLIC_LINKS, ...(user ? STUDENT_LINKS : [])])
+  const footerLinks = launchLinks(FOOTER_LINKS)
 
   async function handleLogout() {
     trackClick('nav-logout')
@@ -203,7 +211,7 @@ export function Layout() {
             </p>
           </div>
           <nav className="flex flex-wrap gap-4" aria-label="روابط قانونية">
-            {FOOTER_LINKS.map((l) => (
+            {footerLinks.map((l) => (
               <Link key={l.to} to={l.to} className="hover:text-paper" {...tracked(l.id)}>
                 {l.label}
               </Link>

@@ -32,6 +32,43 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(PASSWORD_MAX),
 })
 
+export const AUTH_MODES = ['password', 'social'] as const
+export const OAUTH_PROVIDERS = ['google', 'github'] as const
+export const OAUTH_INTENTS = ['login', 'signup', 'reauth'] as const
+export const OAUTH_ERROR_CODES = [
+  'cancelled',
+  'failed',
+  'expired',
+  'email_unverified',
+  'use_existing_method',
+  'signup_required',
+  'account_unavailable',
+  'already_signed_in',
+  'rate_limited',
+  'reauth_mismatch',
+  'session_changed',
+] as const
+const NEXT_PATH_MAX = 512
+
+export const oauthStartSchema = z
+  .object({
+    intent: z.enum(OAUTH_INTENTS),
+    next: z.string().max(NEXT_PATH_MAX).optional(),
+    acceptPrivacy: z.boolean().optional(),
+  })
+  .strict()
+
+export type AuthMode = (typeof AUTH_MODES)[number]
+export type OAuthProviderId = (typeof OAUTH_PROVIDERS)[number]
+export type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number]
+
+export interface AuthCapabilities {
+  mode: AuthMode
+  passwordAuth: boolean
+  providers: OAuthProviderId[]
+  linkedProviders: OAuthProviderId[] | null
+}
+
 export const forgotPasswordSchema = z.object({ email: emailSchema })
 
 export const resetPasswordSchema = z.object({
@@ -61,7 +98,7 @@ export const updateProfileSchema = z
   .strict()
 
 export const deleteAccountSchema = z.object({
-  password: z.string().min(1).max(PASSWORD_MAX),
+  password: z.string().min(1).max(PASSWORD_MAX).optional(),
   confirm: z.literal('DELETE'),
 })
 

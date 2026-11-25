@@ -3,12 +3,46 @@ import { BookOpen, CheckCircle2, Clock, Eye, Lock } from 'lucide-react'
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { Container } from '../components/Layout'
-import { Badge, Button, Card, ErrorState, Loading, Notice, TrackedLink } from '../components/ui'
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  ErrorState,
+  Loading,
+  Notice,
+  TrackedLink,
+} from '../components/ui'
 import { ApiRequestError, api, errorMessage } from '../lib/api'
 import { analytics } from '../lib/analytics'
 import { useMe } from '../lib/auth'
+import {
+  FREE_PROJECT_PATH,
+  FREE_PROJECT_SLUG,
+  isFreeCatalogProject,
+  isFreeLaunch,
+} from '../lib/launch'
 import { usePageTitle } from '../lib/seo'
 import { useProject } from '../lib/queries'
+
+export function UnavailableInBeta() {
+  return (
+    <Container className="max-w-xl text-center">
+      <Lock className="mx-auto mb-4 size-8 text-amber" aria-hidden />
+      <h1 className="mb-3 text-2xl font-bold">المحتوى ده مش متاح في البيتا المجانية</h1>
+      <p className="mb-8 leading-8 text-muted">
+        البيتا العامة دلوقتي مركزة على TaskFlow Lite بس. ابدأ منه، كله مجاني ومن غير كارت.
+      </p>
+      <ButtonLink
+        to={FREE_PROJECT_PATH}
+        analyticsId="dashboard-start-taskflow"
+        analyticsProps={{ project_id: FREE_PROJECT_SLUG }}
+      >
+        روح لـ TaskFlow Lite
+      </ButtonLink>
+    </Container>
+  )
+}
 
 export function ProjectPage() {
   const { slug = '' } = useParams()
@@ -28,7 +62,7 @@ export function ProjectPage() {
 
   usePageTitle(project?.title)
   useEffect(() => {
-    if (project?.tier === 'PRO')
+    if (project?.tier === 'PRO' && !isFreeLaunch())
       analytics.capture('pro_page_viewed', { source: `project:${project.slug}` })
   }, [project?.tier, project?.slug])
 
@@ -45,6 +79,7 @@ export function ProjectPage() {
     )
   }
   if (!project) return null
+  if (isFreeLaunch() && !isFreeCatalogProject(project)) return <UnavailableInBeta />
 
   const comingSoon = project.status === 'COMING_SOON'
   const isPro = project.tier === 'PRO'

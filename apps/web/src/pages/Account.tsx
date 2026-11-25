@@ -1,13 +1,21 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import type { PublicUser } from '@pb/shared'
+import {
+  type AuthCapabilities,
+  OAUTH_ERROR_CODES,
+  type OAuthErrorCode,
+  type OAuthProviderId,
+  type PublicUser,
+} from '@pb/shared'
 import { Download } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Container } from '../components/Layout'
-import { Button, Card, Field, Notice, PageHeader } from '../components/ui'
+import { Button, Card, Field, Loading, Notice, PageHeader } from '../components/ui'
 import { api, errorMessage, fieldErrors } from '../lib/api'
-import { syncConsentToServer, useAuthActions, useMe } from '../lib/auth'
+import { syncConsentToServer, useAuthActions, useAuthCapabilities, useMe } from '../lib/auth'
+import { CapabilitiesError, PROVIDER_LABELS, ProviderIcon } from './AuthPages'
 import { getConsent, onConsentChange, setConsent } from '../lib/consent'
+import { isFreeLaunch } from '../lib/launch'
 
 interface Purchase {
   id: string
@@ -75,6 +83,18 @@ function Profile({ user }: { user: PublicUser }) {
   )
 }
 
+function PasswordSetupHint() {
+  return (
+    <p className="text-sm leading-7 text-muted">
+      دخلت بـ Google أو GitHub ومعندكش كلمة مرور؟{' '}
+      <Link to="/forgot-password" className="text-amber-2 hover:underline">
+        اعمل كلمة مرور من لينك على إيميلك
+      </Link>{' '}
+      الأول.
+    </p>
+  )
+}
+
 function ChangePassword() {
   const [currentPassword, setCurrent] = useState('')
   const [newPassword, setNew] = useState('')
@@ -95,6 +115,7 @@ function ChangePassword() {
         }}
         className="space-y-5"
       >
+        <PasswordSetupHint />
         <Field
           label="كلمة المرور الحالية"
           type="password"
@@ -201,23 +222,171 @@ function Purchases() {
   )
 }
 
-function Privacy() {
+function useDeleteAccount() {
   const navigate = useNavigate()
   const { setUser } = useAuthActions()
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const del = useMutation({
-    mutationFn: () => api.post('/api/me/delete', { password, confirm }),
+  return useMutation({
+    mutationFn: (body: { confirm: string; password?: string }) => api.post('/api/me/delete', body),
     onSuccess: () => {
       setUser(null)
       navigate('/')
     },
   })
+}
+
+function PasswordDelete() {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const del = useDeleteAccount()
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    del.mutate()
+    del.mutate({ password, confirm })
   }
+
+  return (
+    <form onSubmit={submit} className="mt-4 space-y-4">
+      <PasswordSetupHint />
+      <Field
+        label="كلمة المرور"
+        type="password"
+        autoComplete="current-password"
+        dir="ltr"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <Field
+        label="اكتب DELETE للتأكيد"
+        dir="ltr"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+      />
+      {del.isError && (
+        <p role="alert" className="text-sm text-rose">
+          {errorMessage(del.error)}
+        </p>
+      )}
+      <Button
+        type="submit"
+        variant="danger"
+        disabled={confirm !== 'DELETE' || !password}
+        loading={del.isPending}
+      >
+        امسح الحساب نهائيًا
+      </Button>
+    </form>
+  )
+}
+
+const REAUTH_ERROR_MESSAGES: Partial<Record<OAuthErrorCode, string>> = {
+  cancelled: 'لغيت التأكيد. الحساب لسه موجود.',
+  reauth_mismatch: 'الحساب اللي اخترته مش هو الحساب المربوط بيك. اختار نفس الحساب اللي سجلت بيه.',
+  session_changed: 'الجلسة اتغيرت أثناء التأكيد. ادخل تاني وابدأ من الأول.',
+  expired: 'التأكيد انتهى أو اتفتح في متصفح تاني. جرب تاني.',
+  email_unverified: 'الإيميل في الحساب ده مش متأكد عند مقدم الخدمة.',
+}
+const REAUTH_FALLBACK_ERROR = 'مقدرناش نأكد هويتك. جرب تاني.'
+
+function reauthErrorMessage(raw: string | null): string | null {
+  const code = OAUTH_ERROR_CODES.find((c) => c === raw)
+  if (!code) return null
+  return REAUTH_ERROR_MESSAGES[code] ?? REAUTH_FALLBACK_ERROR
+}
+
+// Step 1: type DELETE. Step 2: re-confirm with the linked provider (full redirect).
+// Step 3: back here with ?reauth=ok, press the explicit final delete within ~5 minutes.
+function ReauthDelete({ providers }: { providers: OAuthProviderId[] }) {
+  const [params, setParams] = useSearchParams()
+  const returnedFromReauth = params.get('reauth') === 'ok'
+  const reauthError = reauthErrorMessage(params.get('reauth_error'))
+  const [confirm, setConfirm] = useState('')
+  const del = useDeleteAccount()
+  const start = useMutation({
+    mutationFn: (provider: OAuthProviderId) =>
+      api.post<{ url: string }>(`/api/auth/oauth/${provider}/start`, { intent: 'reauth' }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  })
+
+  function restart() {
+    setParams({}, { replace: true })
+    del.reset()
+  }
+
+  if (returnedFromReauth) {
+    return (
+      <div className="mt-4 space-y-4">
+        <Notice>
+          لو خلصت التأكيد بحسابك المربوط، اضغط على المسح النهائي من نفس الجهاز خلال حوالي 5 دقايق.
+          لو التأكيد مش صالح أو انتهى، المسح مش هيتم وهتحتاج تأكد تاني.
+        </Notice>
+        {del.isError && (
+          <p role="alert" className="text-sm text-rose">
+            {errorMessage(del.error)}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="danger"
+            loading={del.isPending}
+            onClick={() => del.mutate({ confirm: 'DELETE' })}
+          >
+            امسح الحساب نهائيًا
+          </Button>
+          <Button type="button" variant="quiet" onClick={restart}>
+            إلغاء
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {reauthError && (
+        <div role="alert">
+          <Notice tone="rose">{reauthError}</Notice>
+        </div>
+      )}
+      <Field
+        label="اكتب DELETE للتأكيد"
+        dir="ltr"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+      />
+      <p className="text-sm leading-7 text-muted">
+        بعد كده هنحولك لحسابك المربوط تأكد إنه إنت، وترجع هنا تضغط على المسح النهائي.
+      </p>
+      <div className="space-y-3">
+        {providers.map((provider) => (
+          <Button
+            key={provider}
+            type="button"
+            variant="danger"
+            className="w-full"
+            disabled={confirm !== 'DELETE' || start.isPending || start.isSuccess}
+            loading={start.isPending && start.variables === provider}
+            onClick={() => start.mutate(provider)}
+          >
+            <ProviderIcon provider={provider} />
+            <span>
+              أكد هويتك بـ <bdi>{PROVIDER_LABELS[provider]}</bdi>
+            </span>
+          </Button>
+        ))}
+      </div>
+      {start.isError && (
+        <p role="alert" className="text-sm text-rose">
+          {errorMessage(start.error)}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Privacy({ capabilities }: { capabilities: AuthCapabilities }) {
+  const passwordAuth = capabilities.passwordAuth
+  const linked = capabilities.linkedProviders ?? []
 
   return (
     <Card className="border-rose/30">
@@ -231,55 +400,53 @@ function Privacy() {
       >
         <Download className="size-4" aria-hidden /> نزل بياناتي
       </a>
-      <h3 className="mb-2 font-semibold text-rose">امسح حسابي</h3>
+      <h3 id="delete-account" className="mb-2 font-semibold text-rose">
+        امسح حسابي
+      </h3>
       <Notice tone="rose">
         هنمسح اسمك وإيميلك وتقدمك يبقى مش مربوط بيك، وهنخرجك من كل الأجهزة. الخطوة دي مش بترجع.
       </Notice>
-      <form onSubmit={submit} className="mt-4 space-y-4">
-        <Field
-          label="كلمة المرور"
-          type="password"
-          autoComplete="current-password"
-          dir="ltr"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Field
-          label="اكتب DELETE للتأكيد"
-          dir="ltr"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-        {del.isError && (
-          <p role="alert" className="text-sm text-rose">
-            {errorMessage(del.error)}
-          </p>
-        )}
-        <Button
-          type="submit"
-          variant="danger"
-          disabled={confirm !== 'DELETE' || !password}
-          loading={del.isPending}
-        >
-          امسح الحساب نهائيًا
-        </Button>
-      </form>
+      {linked.length > 0 && <ReauthDelete providers={linked} />}
+      {passwordAuth && linked.length > 0 && (
+        <p className="mt-6 text-sm text-muted">أو امسح باستخدام كلمة المرور:</p>
+      )}
+      {passwordAuth && <PasswordDelete />}
+      {!passwordAuth && linked.length === 0 && (
+        <p className="mt-4 text-sm leading-7 text-muted">
+          حسابك مش مربوط بحساب Google أو GitHub متاح للتأكيد دلوقتي. تواصل معانا من صفحة{' '}
+          <Link to="/contact" className="text-amber-2 hover:underline">
+            التواصل
+          </Link>{' '}
+          عشان نساعدك تمسحه.
+        </p>
+      )}
     </Card>
   )
 }
 
 export function Account() {
   const { data: user } = useMe()
+  const capabilities = useAuthCapabilities()
   if (!user) return null
+  if (capabilities.isLoading) return <Loading />
+  if (!capabilities.data) {
+    return (
+      <Container className="max-w-2xl">
+        <PageHeader eyebrow="حسابي" title="الإعدادات" />
+        <CapabilitiesError onRetry={() => capabilities.refetch()} />
+      </Container>
+    )
+  }
+  const passwordAuth = capabilities.data.passwordAuth
   return (
     <Container className="max-w-2xl">
       <PageHeader eyebrow="حسابي" title="الإعدادات" />
       <div className="space-y-6">
         <Profile user={user} />
-        <ChangePassword />
+        {passwordAuth && <ChangePassword />}
         <AnalyticsSettings />
-        <Purchases />
-        <Privacy />
+        {!isFreeLaunch() && <Purchases />}
+        <Privacy capabilities={capabilities.data} />
       </div>
     </Container>
   )

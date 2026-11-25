@@ -1,8 +1,9 @@
 import { type ComponentType, Suspense, lazy, useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { RequireAuth } from './components/Guards'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
+import { FREE_LAUNCH_BLOCKED_PATHS, FREE_PROJECT_PATH, isFreeLaunch } from './lib/launch'
 import { Account } from './pages/Account'
 import { ForgotPassword, Login, ResetPassword, Signup } from './pages/AuthPages'
 import { Curriculum } from './pages/Curriculum'
@@ -37,6 +38,40 @@ function ScrollToTop() {
   return null
 }
 
+function commerceRoutes() {
+  if (isFreeLaunch()) {
+    return FREE_LAUNCH_BLOCKED_PATHS.map((path) => (
+      <Route
+        key={path}
+        path={path.slice(1)}
+        element={<Navigate to={FREE_PROJECT_PATH} replace />}
+      />
+    ))
+  }
+  return (
+    <>
+      <Route path="pricing" element={<Pricing />} />
+      <Route path="refund-policy" element={<RefundPage />} />
+      <Route
+        path="checkout"
+        element={
+          <RequireAuth>
+            <Checkout />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="checkout/status"
+        element={
+          <RequireAuth>
+            <CheckoutStatus />
+          </RequireAuth>
+        }
+      />
+    </>
+  )
+}
+
 export function App() {
   return (
     <>
@@ -45,7 +80,7 @@ export function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Landing />} />
-            <Route path="pricing" element={<Pricing />} />
+            {commerceRoutes()}
             <Route path="curriculum" element={<Curriculum />} />
             <Route path="projects/:slug" element={<ProjectPage />} />
             <Route path="projects/:slug/lessons/:lessonSlug" element={<LessonPage />} />
@@ -55,7 +90,6 @@ export function App() {
             <Route path="reset-password" element={<ResetPassword />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />
-            <Route path="refund-policy" element={<RefundPage />} />
             <Route path="contact" element={<ContactPage />} />
 
             <Route
@@ -98,23 +132,6 @@ export function App() {
                 </RequireAuth>
               }
             />
-            <Route
-              path="checkout"
-              element={
-                <RequireAuth>
-                  <Checkout />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="checkout/status"
-              element={
-                <RequireAuth>
-                  <CheckoutStatus />
-                </RequireAuth>
-              }
-            />
-
             <Route
               path="admin"
               element={

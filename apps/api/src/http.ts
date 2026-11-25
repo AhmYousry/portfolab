@@ -19,6 +19,12 @@ export const errors = {
   forbidden: (message = 'مش مسموح لك تشوف ده') => new HttpError(403, 'FORBIDDEN', message),
   notFound: (message = 'مش موجود') => new HttpError(404, 'NOT_FOUND', message),
   conflict: (message: string) => new HttpError(409, 'CONFLICT', message),
+  passwordAuthDisabled: () =>
+    new HttpError(
+      403,
+      'PASSWORD_AUTH_DISABLED',
+      'الدخول بكلمة المرور مش متاح هنا. استخدم Google أو GitHub.',
+    ),
 }
 
 export function ok<T>(res: Response, data: T, meta?: Record<string, unknown>, status = 200) {

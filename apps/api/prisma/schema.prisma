@@ -79,6 +79,68 @@ model User {
   leadEvents          LeadEvent[]
   auditLogs           AuditLog[]
   analyticsClaims     AnalyticsClaim[]
+  oauthIdentities     OAuthIdentity[]
+  reauthGrants        ReauthGrant[]
+}
+
+enum OAuthProvider {
+  GOOGLE
+  GITHUB
+}
+
+// Links an external provider account (stable subject id) to exactly one user. No provider tokens stored.
+model OAuthIdentity {
+  id          String        @id @default(cuid())
+  userId      String
+  provider    OAuthProvider
+  subject     String
+  createdAt   DateTime      @default(now())
+  lastLoginAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
+}
+
+// One row per authorization request. Consumed atomically exactly once by the callback.
+model OAuthAttempt {
+  id              String        @id @default(cuid())
+  stateHash       String        @unique
+  provider        OAuthProvider
+  intent          String
+  codeVerifier    String
+  nonce           String
+  nextPath        String
+  privacyAccepted Boolean       @default(false)
+  // Set only for intent "reauth": the signed-in user and exact session that started the flow.
+  userId          String?
+  sessionId       String?
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([expiresAt])
+}
+
+// Short-lived, single-use proof of a fresh provider re-authentication. Only the token hash is
+// stored; it is bound to one user and one session and consumed inside the action's transaction.
+model ReauthGrant {
+  id         String        @id @default(cuid())
+  tokenHash  String        @unique
+  userId     String
+  sessionId  String
+  provider   OAuthProvider
+  purpose    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // One row per "this event may fire only once for this user + subject".
@@ -103,7 +165,8 @@ model Session {
   createdAt        DateTime  @default(now())
   userAgent        String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reauthGrants ReauthGrant[]
 
   @@index([userId])
 }

@@ -8,6 +8,7 @@ Arabic-first (RTL) learning platform where junior developers build, test, deploy
 - Analytics (PostHog): [`docs/analytics/posthog-setup.md`](docs/analytics/posthog-setup.md) · Payments (Paymob): [`docs/payments/paymob.md`](docs/payments/paymob.md)
 - What is built and what is not: [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md)
 - Decisions and open owner questions: [`DECISIONS.md`](DECISIONS.md)
+- Zero-cost beta setup (Render Free + Neon Free, social sign-in): [`deploy/RENDER_FREE.md`](deploy/RENDER_FREE.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`docs/roadmap.md`](docs/roadmap.md) · Acceptance criteria: [`docs/acceptance-criteria.md`](docs/acceptance-criteria.md)
 
 ## Stack
@@ -48,6 +49,19 @@ Open http://localhost:5173. API health: http://localhost:4000/api/health.
 
 Make an existing user an admin: `pnpm --filter @pb/api make-admin you@example.com`.
 
+### Neon (database provisioning only)
+
+`neon init` / `neon deploy` provision the Postgres database declared in `neon.ts` (Postgres only, no Neon Auth). They do **not** host the app; hosting is Render ([`deploy/RENDER_FREE.md`](deploy/RENDER_FREE.md)). `neon init` writes `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) to the root `.env.local` (gitignored).
+
+API `dev`, `start`, `db:seed`, `content:import`, `make-admin`, `payments:reconcile`, `analytics:purge` and root `render:start` load `apps/api/.env` → root `.env` → root `.env.local` (later wins; shell/host env always wins), so the root Neon URL overrides the local Docker one. Delete or rename root `.env.local` to go back to Docker.
+
+```bash
+pnpm neon:migrate                  # prisma migrate deploy via DIRECT_DATABASE_URL / DATABASE_URL_UNPOOLED
+pnpm db:seed                       # content import (+ optional admin) into the same database
+```
+
+`neon:migrate` never runs `migrate dev`/`reset`. `pnpm db:migrate` (migrate dev) still reads only `apps/api/.env`. Vitest uses `TEST_DATABASE_URL` and Playwright starts the API with `dev:local` (`apps/api/.env` only), so tests never touch Neon. Playwright refuses to reuse an API already on port 4000, so stop your normal `pnpm dev` API before running E2E.
+
 ## Tests
 
 ```bash
@@ -81,7 +95,7 @@ HttpOnly/SameSite session cookies (Secure in production) with server-side revoca
 
 ## Not implemented (by design, needs owner approval)
 
-Live payments (Paymob is integrated but sandbox-only and gated), real email delivery for password reset, PostHog project + dashboards (need your account), Instagram DM automation, deployment. See `IMPLEMENTATION_STATUS.md`.
+Live payments (Paymob is integrated but sandbox-only and gated), live password-reset email (Resend adapter is implemented; needs a verified sending domain and API key), PostHog project + dashboards (need your account), Instagram DM automation, deployment. See `IMPLEMENTATION_STATUS.md`.
 
 ## Troubleshooting
 
@@ -91,4 +105,5 @@ Live payments (Paymob is integrated but sandbox-only and gated), real email deli
 | `/api/health` says `database: down` | `docker compose ps`; check `DATABASE_URL` port |
 | API tests fail on connect | The `portfolio_builder_test` DB is created on first container init; if your volume predates that, run `docker compose exec db createdb -U pb portfolio_builder_test` |
 | Port 5432 busy | Stop the other Postgres or change the port mapping and `DATABASE_URL` |
-| Password reset email never arrives | Expected: no email provider yet. In development the link is printed in the API console |
+| Password reset email never arrives | In development/test no email is sent; the link is printed in the API console. In production check the API log for `[mailer] password reset delivery failed` (reason/status only) and that the `EMAIL_FROM` domain is verified in Resend |
+| API exits with `Invalid mailer configuration` | Production requires `RESEND_API_KEY` (`re_...`) and `EMAIL_FROM` on a verified domain; see `apps/api/.env.example` |
