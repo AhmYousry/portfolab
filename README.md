@@ -2,6 +2,16 @@
 
 **Build Real Projects. Prove Your Skills.**
 
+## Why Portfolab
+
+Many Arabic-speaking beginners finish courses but still have no portfolio that reflects what employers actually hire for, and there is very little project-based learning content in Arabic. Portfolab closes that gap: learners build complete full-stack projects, with tests, deployment and a written explanation, so they finish with real work they can show in interviews.
+
+**Who it is for:** junior developers and new graduates who want job-ready portfolio projects.
+
+**How it works:** Arabic lessons with checkpoints, a starter repo with TODO markers, and a tested reference solution for each project.
+
+**Market-driven:** project ideas are chosen from skills that job postings repeatedly ask for.
+
 Arabic-first (RTL) learning platform where junior developers build, test, deploy and explain real full-stack portfolio projects. The free tier ships one complete project (**TaskFlow Lite**); Pro projects (**Portfolab Pro**) are listed as *Coming soon* until they are built and reviewed. Portfolab is made by the team behind the *Ahmed & Claude* Instagram series.
 
 - Original product spec (written under the working name *Ahmed & Claude — Portfolio Builder*): [`Ahmed_Claude_Portfolio_Builder_Claude_Code.md`](Ahmed_Claude_Portfolio_Builder_Claude_Code.md)
