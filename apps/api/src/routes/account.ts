@@ -8,12 +8,16 @@ import { clearSessionCookie } from '../security/session.js'
 import {
   clearReauthCookie,
   deleteWithGrant,
+  deleteWithNeonProof,
   deleteWithPassword,
+  neonReauthRequired,
   readReauthCookie,
   reauthRequired,
 } from '../services/account-deletion.js'
-import { passwordAuthEnabled } from '../services/auth-mode.js'
+import { neonAuthEnabled, passwordAuthEnabled } from '../services/auth-mode.js'
+import { verifyNeonProof } from '../services/neon-auth.js'
 import { toPublicUser } from '../services/users.js'
+import { toNeonHttpError } from './neon-auth.js'
 
 export const accountRouter = Router()
 
@@ -71,6 +75,7 @@ accountRouter.get('/me/export', async (req, res) => {
       oauthIdentities: {
         select: { provider: true, subject: true, createdAt: true, lastLoginAt: true },
       },
+      neonIdentity: { select: { subject: true, createdAt: true, lastLoginAt: true } },
     },
   })
   res.setHeader('Cache-Control', 'private, no-store')
@@ -78,13 +83,31 @@ accountRouter.get('/me/export', async (req, res) => {
   res.json({ data: { exportedAt: new Date().toISOString(), user }, error: null })
 })
 
-// Two proofs are accepted: the account password (password mode only), or a fresh single-use
-// provider re-authentication grant bound to this exact session (HttpOnly cookie).
+// Proofs accepted: the account password (password mode only); a fresh single-use provider
+// re-authentication grant bound to this exact session (social mode, HttpOnly cookie); or, in neon
+// mode only, a verified Neon session created by a fresh sign-in.
 accountRouter.post('/me/delete', authLimiter, async (req, res) => {
   const viewer = requireUser(req)
   const input = parse(deleteAccountSchema, req.body)
 
-  if (input.password !== undefined) {
+  if (neonAuthEnabled()) {
+    clearReauthCookie(res)
+    if (!input.neonProof || input.password !== undefined) throw neonReauthRequired()
+    let verified: Awaited<ReturnType<typeof verifyNeonProof>>
+    try {
+      verified = await verifyNeonProof(input.neonProof)
+    } catch (err) {
+      throw toNeonHttpError(err)
+    }
+    await deleteWithNeonProof({
+      userId: viewer.id,
+      sessionId: viewer.sessionId,
+      subject: verified.claims.subject,
+      upstreamCreatedAt: verified.session.createdAt,
+    })
+  } else if (input.neonProof !== undefined) {
+    throw errors.badRequest()
+  } else if (input.password !== undefined) {
     if (!passwordAuthEnabled()) throw errors.passwordAuthDisabled()
     const user = await prisma.user.findUniqueOrThrow({ where: { id: viewer.id } })
     if (!(await verifyPassword(user.passwordHash, input.password))) {

@@ -32,7 +32,7 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(PASSWORD_MAX),
 })
 
-export const AUTH_MODES = ['password', 'social'] as const
+export const AUTH_MODES = ['password', 'social', 'neon'] as const
 export const OAUTH_PROVIDERS = ['google', 'github'] as const
 export const OAUTH_INTENTS = ['login', 'signup', 'reauth'] as const
 export const OAUTH_ERROR_CODES = [
@@ -67,7 +67,43 @@ export interface AuthCapabilities {
   passwordAuth: boolean
   providers: OAuthProviderId[]
   linkedProviders: OAuthProviderId[] | null
+  // Public Neon Auth URL for the browser SDK; set only in neon mode. Never a secret.
+  neonAuthUrl: string | null
 }
+
+const NEON_TOKEN_MAX = 8192
+const NEON_SESSION_ID_MAX = 255
+
+// Proof of a live Neon Auth session: the signed JWT plus the upstream session id it came with.
+// Neither value is trusted until the server verifies the JWT and the session row.
+export const neonProofSchema = z
+  .object({
+    token: z.string().min(1).max(NEON_TOKEN_MAX),
+    sessionId: z.string().min(1).max(NEON_SESSION_ID_MAX),
+  })
+  .strict()
+
+export const NEON_INTENTS = ['login', 'signup'] as const
+
+export const neonSessionSchema = neonProofSchema
+  .extend({
+    intent: z.enum(NEON_INTENTS),
+    acceptPrivacy: z.boolean().optional(),
+    utm: utmSchema.optional(),
+  })
+  .strict()
+
+export const NEON_ERROR_CODES = [
+  'NEON_AUTH_DISABLED',
+  'NEON_TOKEN_INVALID',
+  'NEON_SESSION_INVALID',
+  'EMAIL_UNVERIFIED',
+  'EMAIL_IN_USE',
+  'SIGNUP_REQUIRED',
+  'ACCOUNT_UNAVAILABLE',
+] as const
+export type NeonErrorCode = (typeof NEON_ERROR_CODES)[number]
+export type NeonProof = z.infer<typeof neonProofSchema>
 
 export const forgotPasswordSchema = z.object({ email: emailSchema })
 
@@ -99,6 +135,7 @@ export const updateProfileSchema = z
 
 export const deleteAccountSchema = z.object({
   password: z.string().min(1).max(PASSWORD_MAX).optional(),
+  neonProof: neonProofSchema.optional(),
   confirm: z.literal('DELETE'),
 })
 

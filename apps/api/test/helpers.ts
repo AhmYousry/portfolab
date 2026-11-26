@@ -13,6 +13,7 @@ const TABLES = [
   'ReauthGrant',
   'OAuthAttempt',
   'OAuthIdentity',
+  'NeonAuthIdentity',
   'AnalyticsClaim',
   'AuditLog',
   'LeadEvent',

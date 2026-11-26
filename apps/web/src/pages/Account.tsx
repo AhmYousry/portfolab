@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type AuthCapabilities,
   OAUTH_ERROR_CODES,
@@ -12,8 +12,16 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Container } from '../components/Layout'
 import { Button, Card, Field, Loading, Notice, PageHeader } from '../components/ui'
 import { api, errorMessage, fieldErrors } from '../lib/api'
-import { syncConsentToServer, useAuthActions, useAuthCapabilities, useMe } from '../lib/auth'
-import { CapabilitiesError, PROVIDER_LABELS, ProviderIcon } from './AuthPages'
+import {
+  ME_KEY,
+  exchangeNeonSession,
+  syncConsentToServer,
+  useAuthActions,
+  useAuthCapabilities,
+  useMe,
+} from '../lib/auth'
+import { neonChangePassword, neonSignIn, neonSignOut } from '../lib/neon-auth'
+import { CapabilitiesError, PROVIDER_LABELS, ProviderIcon, authErrorMessage } from './AuthPages'
 import { getConsent, onConsentChange, setConsent } from '../lib/consent'
 import { isFreeLaunch } from '../lib/launch'
 
@@ -151,6 +159,78 @@ function ChangePassword() {
   )
 }
 
+const NEON_PASSWORD_MIN = 10
+
+// Neon mode: the password lives in Neon Auth. Changing it revokes every other upstream session
+// (and so every other local session); this device re-binds with a fresh proof.
+function NeonChangePassword({ url }: { url: string }) {
+  const qc = useQueryClient()
+  const { setUser } = useAuthActions()
+  const [currentPassword, setCurrent] = useState('')
+  const [newPassword, setNew] = useState('')
+  const [clientError, setClientError] = useState<string>()
+  const change = useMutation({
+    mutationFn: async () => {
+      const proof = await neonChangePassword(url, { currentPassword, newPassword })
+      return exchangeNeonSession(proof, 'login')
+    },
+    onSuccess: ({ user }) => {
+      setUser(user)
+      setCurrent('')
+      setNew('')
+    },
+    onError: () => qc.invalidateQueries({ queryKey: ME_KEY }),
+  })
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (newPassword.length < NEON_PASSWORD_MIN) {
+      setClientError(`كلمة المرور لازم تكون ${NEON_PASSWORD_MIN} حروف على الأقل`)
+      return
+    }
+    setClientError(undefined)
+    change.mutate()
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-6 text-xl font-bold">تغيير كلمة المرور</h2>
+      <form onSubmit={submit} className="space-y-5 ph-no-capture">
+        <Field
+          label="كلمة المرور الحالية"
+          type="password"
+          autoComplete="current-password"
+          dir="ltr"
+          value={currentPassword}
+          onChange={(e) => setCurrent(e.target.value)}
+        />
+        <Field
+          label="كلمة المرور الجديدة"
+          type="password"
+          autoComplete="new-password"
+          dir="ltr"
+          value={newPassword}
+          onChange={(e) => setNew(e.target.value)}
+          error={clientError}
+        />
+        {change.isSuccess && (
+          <p role="status" className="text-sm text-ok">
+            اتغيرت، وخرجناك من باقي الأجهزة.
+          </p>
+        )}
+        {change.isError && (
+          <p role="alert" className="text-sm text-rose">
+            {authErrorMessage(change.error)}
+          </p>
+        )}
+        <Button type="submit" variant="ghost" loading={change.isPending}>
+          غير كلمة المرور
+        </Button>
+      </form>
+    </Card>
+  )
+}
+
 function AnalyticsSettings() {
   const [consent, setLocal] = useState(() => getConsent() ?? { analytics: false, replay: false })
   const [saved, setSaved] = useState(false)
@@ -278,6 +358,63 @@ function PasswordDelete() {
   )
 }
 
+// Neon mode: a fresh sign-in with the account password produces the proof the API requires.
+function NeonDelete({ url, email }: { url: string; email: string }) {
+  const navigate = useNavigate()
+  const { setUser } = useAuthActions()
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const del = useMutation({
+    mutationFn: async () => {
+      const neonProof = await neonSignIn(url, { email, password })
+      await api.post('/api/me/delete', { confirm, neonProof })
+    },
+    onSuccess: async () => {
+      await neonSignOut(url)
+      setUser(null)
+      navigate('/')
+    },
+  })
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        del.mutate()
+      }}
+      className="mt-4 space-y-4 ph-no-capture"
+    >
+      <Field
+        label="كلمة المرور"
+        type="password"
+        autoComplete="current-password"
+        dir="ltr"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <Field
+        label="اكتب DELETE للتأكيد"
+        dir="ltr"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+      />
+      {del.isError && (
+        <p role="alert" className="text-sm text-rose">
+          {authErrorMessage(del.error)}
+        </p>
+      )}
+      <Button
+        type="submit"
+        variant="danger"
+        disabled={confirm !== 'DELETE' || !password}
+        loading={del.isPending}
+      >
+        امسح الحساب نهائيًا
+      </Button>
+    </form>
+  )
+}
+
 const REAUTH_ERROR_MESSAGES: Partial<Record<OAuthErrorCode, string>> = {
   cancelled: 'لغيت التأكيد. الحساب لسه موجود.',
   reauth_mismatch: 'الحساب اللي اخترته مش هو الحساب المربوط بيك. اختار نفس الحساب اللي سجلت بيه.',
@@ -384,9 +521,10 @@ function ReauthDelete({ providers }: { providers: OAuthProviderId[] }) {
   )
 }
 
-function Privacy({ capabilities }: { capabilities: AuthCapabilities }) {
+function Privacy({ capabilities, email }: { capabilities: AuthCapabilities; email: string }) {
   const passwordAuth = capabilities.passwordAuth
   const linked = capabilities.linkedProviders ?? []
+  const neonUrl = capabilities.mode === 'neon' ? capabilities.neonAuthUrl : null
 
   return (
     <Card className="border-rose/30">
@@ -406,12 +544,13 @@ function Privacy({ capabilities }: { capabilities: AuthCapabilities }) {
       <Notice tone="rose">
         هنمسح اسمك وإيميلك وتقدمك يبقى مش مربوط بيك، وهنخرجك من كل الأجهزة. الخطوة دي مش بترجع.
       </Notice>
-      {linked.length > 0 && <ReauthDelete providers={linked} />}
+      {neonUrl && <NeonDelete url={neonUrl} email={email} />}
+      {!neonUrl && linked.length > 0 && <ReauthDelete providers={linked} />}
       {passwordAuth && linked.length > 0 && (
         <p className="mt-6 text-sm text-muted">أو امسح باستخدام كلمة المرور:</p>
       )}
       {passwordAuth && <PasswordDelete />}
-      {!passwordAuth && linked.length === 0 && (
+      {!neonUrl && !passwordAuth && linked.length === 0 && (
         <p className="mt-4 text-sm leading-7 text-muted">
           حسابك مش مربوط بحساب Google أو GitHub متاح للتأكيد دلوقتي. تواصل معانا من صفحة{' '}
           <Link to="/contact" className="text-amber-2 hover:underline">
@@ -438,15 +577,17 @@ export function Account() {
     )
   }
   const passwordAuth = capabilities.data.passwordAuth
+  const neonUrl = capabilities.data.mode === 'neon' ? capabilities.data.neonAuthUrl : null
   return (
     <Container className="max-w-2xl">
       <PageHeader eyebrow="حسابي" title="الإعدادات" />
       <div className="space-y-6">
         <Profile user={user} />
         {passwordAuth && <ChangePassword />}
+        {neonUrl && <NeonChangePassword url={neonUrl} />}
         <AnalyticsSettings />
         {!isFreeLaunch() && <Purchases />}
-        <Privacy capabilities={capabilities.data} />
+        <Privacy capabilities={capabilities.data} email={user.email} />
       </div>
     </Container>
   )

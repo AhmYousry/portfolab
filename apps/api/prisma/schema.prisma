@@ -81,6 +81,20 @@ model User {
   analyticsClaims     AnalyticsClaim[]
   oauthIdentities     OAuthIdentity[]
   reauthGrants        ReauthGrant[]
+  neonIdentity        NeonAuthIdentity?
+}
+
+// Maps the stable Neon Auth (Managed Better Auth) user id to exactly one local user. Never linked by
+// email. Kept as a tombstone after local deletion so the same upstream account cannot silently
+// re-create a local account.
+model NeonAuthIdentity {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  subject     String    @unique
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum OAuthProvider {
@@ -164,11 +178,15 @@ model Session {
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
   userAgent        String?
+  // Set only in AUTH_MODE=neon: the upstream Neon Auth session this local session is bound to.
+  // The local session is valid only while that upstream session is live.
+  neonSessionId    String?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   reauthGrants ReauthGrant[]
 
   @@index([userId])
+  @@index([neonSessionId])
 }
 
 model PasswordResetToken {

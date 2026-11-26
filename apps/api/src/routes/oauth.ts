@@ -16,7 +16,8 @@ import { createSession } from '../security/session.js'
 import { hmac, randomToken, safeEqual, sha256 } from '../security/tokens.js'
 import { issueDeletionGrant, setReauthCookie } from '../services/account-deletion.js'
 import { track } from '../services/analytics.js'
-import { authMode, passwordAuthEnabled } from '../services/auth-mode.js'
+import { authMode, neonAuthEnabled, passwordAuthEnabled } from '../services/auth-mode.js'
+import { neonAuthConfig } from '../services/neon-auth.js'
 import {
   OAuthFailure,
   type OAuthClient,
@@ -60,7 +61,7 @@ function isProvider(value: unknown): value is OAuthProviderId {
 }
 
 function enabledProvider(raw: unknown): OAuthProviderId | null {
-  if (!isProvider(raw) || !oauthClient(raw)) return null
+  if (neonAuthEnabled() || !isProvider(raw) || !oauthClient(raw)) return null
   return raw
 }
 
@@ -145,12 +146,13 @@ async function linkedProviders(userId: string, enabled: OAuthProviderId[]) {
 // Public discovery + auth capabilities. Linked provider names are added only for the signed-in
 // viewer's own account; never identities, subjects, or emails.
 oauthRouter.get('/providers', async (req, res) => {
-  const providers = enabledProviders()
+  const providers = neonAuthEnabled() ? [] : enabledProviders()
   const capabilities: AuthCapabilities = {
     mode: authMode(),
     passwordAuth: passwordAuthEnabled(),
     providers,
     linkedProviders: req.user ? await linkedProviders(req.user.id, providers) : null,
+    neonAuthUrl: neonAuthEnabled() ? (neonAuthConfig()?.baseUrl ?? null) : null,
   }
   res.setHeader('Cache-Control', 'private, no-store')
   ok(res, capabilities)

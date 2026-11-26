@@ -12,14 +12,24 @@ import { Container } from '../components/Layout'
 import { Button, ButtonLink, Card, ErrorState, Field, Loading, Notice } from '../components/ui'
 import { ApiRequestError, api, errorMessage, fieldErrors } from '../lib/api'
 import { analytics, getUtm, trackClick } from '../lib/analytics'
-import { useAuthActions, useAuthCapabilities, useMe } from '../lib/auth'
+import { exchangeNeonSession, useAuthActions, useAuthCapabilities, useMe } from '../lib/auth'
+import { NeonAuthError, neonSignIn, neonSignOut, neonSignUp, readNeonProof } from '../lib/neon-auth'
 
 const PASSWORD_MIN = 10
 const PRIVACY_REQUIRED = 'لازم توافق على سياسة الخصوصية'
 
-// Only the API error code is sent (e.g. UNAUTHORIZED, CONFLICT, RATE_LIMITED), never form input.
+// Only the API/SDK error code is sent (e.g. UNAUTHORIZED, CONFLICT, RATE_LIMITED), never form input.
 function failureReason(error: unknown): string {
+  if (error instanceof NeonAuthError) return error.code
   return error instanceof ApiRequestError ? error.code : 'NETWORK'
+}
+
+export function authErrorMessage(error: unknown): string {
+  return error instanceof NeonAuthError ? error.message : errorMessage(error)
+}
+
+function isApiCode(error: unknown, code: string) {
+  return error instanceof ApiRequestError && error.code === code
 }
 
 const OAUTH_ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
@@ -195,11 +205,13 @@ function PrivacyConsent({
   onChange,
   error,
   socialOnly,
+  neon = false,
 }: {
   checked: boolean
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   error?: string
   socialOnly: boolean
+  neon?: boolean
 }) {
   return (
     <div>
@@ -221,9 +233,11 @@ function PrivacyConsent({
             الشروط
           </Link>
           .{' '}
-          {socialOnly
-            ? 'بنخزن الإيميل والاسم ومعرّف حسابك في Google أو GitHub وتقدمك في الدروس بس.'
-            : 'بنخزن الإيميل والاسم وتقدمك في الدروس بس (ولو سجلت بـ Google أو GitHub، معرّف حسابك هناك).'}
+          {neon
+            ? 'حسابك وكلمة المرور بيتداروا عند Neon Auth، وإحنا بنخزن الإيميل والاسم ومعرّف حسابك هناك وتقدمك في الدروس بس.'
+            : socialOnly
+              ? 'بنخزن الإيميل والاسم ومعرّف حسابك في Google أو GitHub وتقدمك في الدروس بس.'
+              : 'بنخزن الإيميل والاسم وتقدمك في الدروس بس (ولو سجلت بـ Google أو GitHub، معرّف حسابك هناك).'}
         </span>
       </label>
       {error && <p className="mt-2 text-sm text-rose">{error}</p>}
@@ -233,6 +247,237 @@ function PrivacyConsent({
 
 export function CapabilitiesError({ onRetry }: { onRetry: () => void }) {
   return <ErrorState message="مش قادرين نعرف طرق الدخول المتاحة دلوقتي." onRetry={onRetry} />
+}
+
+function onboardingPath(next: string) {
+  return `/onboarding?next=${encodeURIComponent(next)}`
+}
+
+// Neon mode: the SDK signs in against Neon Auth, then the API verifies the session and binds a
+// local session to it. A first sign-in without a local account asks for privacy consent first.
+function NeonLogin({ url, next }: { url: string; next: string }) {
+  const { signedIn } = useAuthActions()
+  const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [needsConsent, setNeedsConsent] = useState(false)
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false)
+  const [consentError, setConsentError] = useState<string>()
+
+  const login = useMutation({
+    mutationFn: async () => {
+      const proof = needsConsent
+        ? await readNeonProof(url)
+        : await neonSignIn(url, { email, password })
+      return exchangeNeonSession(proof, needsConsent ? 'signup' : 'login', needsConsent)
+    },
+    onSuccess: ({ user, created }) => {
+      navigate(created ? onboardingPath(next) : next, { replace: true })
+      signedIn(user, created ? 'signup' : 'login', 'login_page')
+    },
+    onError: (error) => {
+      analytics.capture('login_failed', { reason: failureReason(error) })
+      if (isApiCode(error, 'SIGNUP_REQUIRED')) {
+        setNeedsConsent(true)
+        return
+      }
+      if (error instanceof ApiRequestError) void neonSignOut(url)
+    },
+  })
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    trackClick('login-submit')
+    if (needsConsent && !acceptPrivacy) {
+      setConsentError(PRIVACY_REQUIRED)
+      return
+    }
+    setConsentError(undefined)
+    login.mutate()
+  }
+
+  const showError = login.isError && !isApiCode(login.error, 'SIGNUP_REQUIRED')
+
+  return (
+    <AuthShell title="أهلًا تاني" subtitle="كمّل من المكان اللي وقفت فيه.">
+      <form onSubmit={submit} className="space-y-5 ph-no-capture" noValidate>
+        {needsConsent ? (
+          <>
+            <Notice tone="amber">
+              دخلت بنجاح، بس لسه مفيش حساب عندنا. وافق على سياسة الخصوصية عشان نكمل حسابك.
+            </Notice>
+            <PrivacyConsent
+              checked={acceptPrivacy}
+              onChange={(e) => setAcceptPrivacy(e.target.checked)}
+              error={consentError}
+              socialOnly
+              neon
+            />
+          </>
+        ) : (
+          <>
+            <Field
+              label="الإيميل"
+              type="email"
+              autoComplete="email"
+              dir="ltr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Field
+              label="كلمة المرور"
+              type="password"
+              autoComplete="current-password"
+              dir="ltr"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </>
+        )}
+        {showError && (
+          <p role="alert" className="text-sm text-rose">
+            {authErrorMessage(login.error)}
+          </p>
+        )}
+        <Button
+          type="submit"
+          className="w-full"
+          loading={login.isPending}
+          analyticsId="login-submit"
+        >
+          {needsConsent ? 'كمّل الحساب' : 'دخول'}
+        </Button>
+      </form>
+      <div className="mt-6 flex flex-wrap justify-between gap-2 text-sm">
+        <Link to="/forgot-password" className="text-muted hover:text-paper">
+          نسيت كلمة المرور؟
+        </Link>
+        <Link to={`/signup?next=${encodeURIComponent(next)}`} className="text-amber-2">
+          حساب جديد
+        </Link>
+      </div>
+    </AuthShell>
+  )
+}
+
+function NeonSignup({ url, next }: { url: string; next: string | null }) {
+  const { signedIn } = useAuthActions()
+  const navigate = useNavigate()
+  const [form, setForm] = useState({
+    displayName: '',
+    email: '',
+    password: '',
+    acceptPrivacy: false,
+  })
+  const [clientErrors, setClientErrors] = useState<Record<string, string>>({})
+
+  const signup = useMutation({
+    mutationFn: async () => {
+      const proof = await neonSignUp(url, {
+        email: form.email.trim(),
+        password: form.password,
+        name: form.displayName.trim(),
+      })
+      return exchangeNeonSession(proof, 'signup', true)
+    },
+    onSuccess: ({ user, created }) => {
+      navigate(created ? onboardingPath(safeNext(next)) : safeNext(next), { replace: true })
+      signedIn(user, created ? 'signup' : 'login', next ? 'signup_with_next' : 'signup_page')
+    },
+    onError: (error) => {
+      analytics.capture('signup_failed', { reason: failureReason(error) })
+      if (error instanceof ApiRequestError) void neonSignOut(url)
+    },
+  })
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    trackClick('signup-submit')
+    const found: Record<string, string> = {}
+    if (form.displayName.trim().length < 2) found.displayName = 'اكتب اسمك (حرفين على الأقل)'
+    if (!form.email.includes('@')) found.email = 'الإيميل مش صحيح'
+    if (form.password.length < PASSWORD_MIN)
+      found.password = `كلمة المرور لازم تكون ${PASSWORD_MIN} حروف على الأقل`
+    if (!form.acceptPrivacy) found.acceptPrivacy = PRIVACY_REQUIRED
+    setClientErrors(found)
+    if (Object.keys(found).length === 0) signup.mutate()
+    else analytics.capture('signup_failed', { reason: 'client_validation' })
+  }
+
+  const update = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({
+      ...f,
+      [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value,
+    }))
+
+  return (
+    <AuthShell title="ابدأ مجانًا" subtitle="من غير كارت. هنحفظ تقدمك ونفتحلك المشروع كامل.">
+      <form onSubmit={submit} className="space-y-5 ph-no-capture" noValidate>
+        <Field
+          label="اسمك"
+          autoComplete="name"
+          value={form.displayName}
+          onChange={update('displayName')}
+          error={clientErrors.displayName}
+        />
+        <Field
+          label="الإيميل"
+          type="email"
+          autoComplete="email"
+          dir="ltr"
+          value={form.email}
+          onChange={update('email')}
+          error={clientErrors.email}
+        />
+        <Field
+          label="كلمة المرور"
+          type="password"
+          autoComplete="new-password"
+          dir="ltr"
+          value={form.password}
+          onChange={update('password')}
+          error={clientErrors.password}
+          hint={`${PASSWORD_MIN} حروف على الأقل. جملة طويلة أحسن من كلمة معقدة.`}
+        />
+        <PrivacyConsent
+          checked={form.acceptPrivacy}
+          onChange={update('acceptPrivacy')}
+          error={clientErrors.acceptPrivacy}
+          socialOnly={false}
+          neon
+        />
+        {signup.isError && (
+          <p role="alert" className="text-sm text-rose">
+            {authErrorMessage(signup.error)}
+          </p>
+        )}
+        <Button
+          type="submit"
+          className="w-full"
+          loading={signup.isPending}
+          analyticsId="signup-submit"
+        >
+          اعمل حساب
+        </Button>
+      </form>
+      <p className="mt-6 text-sm text-muted">
+        عندك حساب؟{' '}
+        <Link to="/login" className="text-amber-2">
+          ادخل
+        </Link>
+      </p>
+    </AuthShell>
+  )
+}
+
+function NeonUnavailable({ title }: { title: string }) {
+  return (
+    <AuthShell title={title}>
+      <NoProvidersNotice />
+    </AuthShell>
+  )
 }
 
 export function Login() {
@@ -279,6 +524,11 @@ export function Login() {
         <CapabilitiesError onRetry={() => capabilities.refetch()} />
       </AuthShell>
     )
+  }
+
+  if (capabilities.data.mode === 'neon') {
+    const url = capabilities.data.neonAuthUrl
+    return url ? <NeonLogin url={url} next={next} /> : <NeonUnavailable title="أهلًا تاني" />
   }
 
   if (socialOnly) {
@@ -439,6 +689,11 @@ export function Signup() {
     )
   }
 
+  if (capabilities.data.mode === 'neon') {
+    const url = capabilities.data.neonAuthUrl
+    return url ? <NeonSignup url={url} next={next} /> : <NeonUnavailable title="ابدأ مجانًا" />
+  }
+
   if (socialOnly) {
     return (
       <AuthShell
@@ -520,14 +775,25 @@ export function Signup() {
   )
 }
 
-function SocialOnlyFallback({ title }: { title: string }) {
+function SocialOnlyFallback({ title, neon = false }: { title: string; neon?: boolean }) {
   return (
     <AuthShell title={title}>
-      <p className="mb-6 text-sm leading-7 text-muted">
-        Portfolab بيستخدم الدخول بـ Google أو GitHub بس، ومفيش كلمات مرور عندنا تتنسي أو تتغير. ادخل
-        بنفس الحساب اللي سجلت بيه. لو مش قادر تدخل على حساب Google أو GitHub نفسه، استرجعه من خلالهم
-        الأول.
-      </p>
+      {neon ? (
+        <p className="mb-6 text-sm leading-7 text-muted">
+          استرجاع كلمة المرور من الموقع مش متاح لسه في النسخة التجريبية. لو نسيت كلمة المرور، تواصل
+          معانا من صفحة{' '}
+          <Link to="/contact" className="text-amber-2 hover:underline">
+            التواصل
+          </Link>{' '}
+          وهنساعدك.
+        </p>
+      ) : (
+        <p className="mb-6 text-sm leading-7 text-muted">
+          Portfolab بيستخدم الدخول بـ Google أو GitHub بس، ومفيش كلمات مرور عندنا تتنسي أو تتغير.
+          ادخل بنفس الحساب اللي سجلت بيه. لو مش قادر تدخل على حساب Google أو GitHub نفسه، استرجعه من
+          خلالهم الأول.
+        </p>
+      )}
       <ButtonLink to="/login" className="w-full">
         روح لصفحة الدخول
       </ButtonLink>
@@ -551,7 +817,7 @@ export function ForgotPassword() {
     )
   }
   if (capabilities.data.passwordAuth === false) {
-    return <SocialOnlyFallback title="نسيت كلمة المرور" />
+    return <SocialOnlyFallback title="نسيت كلمة المرور" neon={capabilities.data.mode === 'neon'} />
   }
 
   return (
@@ -608,7 +874,12 @@ export function ResetPassword() {
     )
   }
   if (capabilities.data.passwordAuth === false) {
-    return <SocialOnlyFallback title="إعادة تعيين كلمة المرور" />
+    return (
+      <SocialOnlyFallback
+        title="إعادة تعيين كلمة المرور"
+        neon={capabilities.data.mode === 'neon'}
+      />
+    )
   }
 
   if (!/^[a-f0-9]{64}$/.test(token)) {

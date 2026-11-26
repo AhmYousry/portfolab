@@ -1,6 +1,6 @@
 # Implementation status — Portfolab
 
-Last updated: 2026-11-25 (zero-budget beta preparation)
+Last updated: 2026-11-26 (managed Neon Auth verification)
 
 ## Zero-budget beta
 
@@ -17,6 +17,16 @@ Executed locally on 2026-11-25:
 - Browser checks also passed for capabilities-request failures across signup, login, recovery, and account settings.
 
 Website hosting and real provider callbacks are pending. Neon Free is now connected; the owner still needs a Render account and at least one OAuth client pair. Hosting regions and the remaining legal draft text need final review after account setup.
+
+## Neon Auth email/password mode (2026-11-26, live signup verified)
+
+`AUTH_MODE=neon` is an explicit opt-in; `password` and `social` are unchanged. The browser uses the official `@neon/auth` SDK (`signUp.email`, `signIn.email`, `getSession`, `changePassword`, `signOut`) with the Auth URL delivered at runtime through `/api/auth/oauth/providers` (`neonAuthUrl`), so no build-time alias or secret is needed. `POST /api/auth/neon/session` verifies the Neon JWT (project JWKS, EdDSA only, issuer, audience, expiry, max age) and requires a live `neon_auth.session` row owned by the token subject before creating a local session bound to it (`Session.neonSessionId`, expiry capped at the upstream expiry). `loadSession` re-checks the upstream row on every request and revokes the local session when it is gone, and fails closed on lookup errors. Neon mode accepts only Neon-bound sessions; other modes reject them.
+
+Identity mapping is the new `NeonAuthIdentity` model (unique `subject`, unique `userId`, migration `20261126120000_neon_auth_identity`). Email collisions with existing local users are refused (`EMAIL_IN_USE`) and never auto-linked; local password hashes are never written for existing users. New local accounts require privacy consent (`SIGNUP_REQUIRED` otherwise; the login page offers the consent step). Deletion in neon mode requires a Neon sign-in from the last 5 minutes for the same subject; the identity row remains as a tombstone (`ACCOUNT_UNAVAILABLE` on re-entry). Legacy change-password, reset, password deletion, OAuth start/callback and reauth grants are refused in neon mode. CSP `connect-src` allows the Neon Auth origin only in neon mode.
+
+Tests added in `apps/api/test/neon-auth.test.ts`: mode validation, forged/foreign-key/wrong-issuer/wrong-audience/expired/HS256/unsigned/tampered tokens, session-ownership mismatch, client-supplied identity fields, privacy consent, email collision, subject-based login, upstream revocation, fail-closed lookup, cross-mode session separation, logout, and deletion (stale/foreign/legacy proofs and the deleted-user tombstone). All 19 tests passed against the isolated local test database.
+
+Neon CLI install/init/deploy completed for the requested production branch; Auth is enabled and the seventh additive migration is applied. The organization remains on Free. Actual SDK signup/getSession/signout/signin passed, and live JWT issuer/audience and managed session column names were confirmed. Local browser signup, same-user readback, reload, logout/copied-cookie rejection, wrong-password messaging, relogin, protected-page redirection, and upstream-session revocation passed against real Neon. Synthetic test accounts were cleaned up. Typecheck, lint, web tests (61) and shared tests (7) passed. The initial existing API suite had two expected-response failures caused by the added nullable capability field; the expectations were updated and all 12 tests in that affected file passed. Render now defaults to neon mode; local env also opts in. Pending: Render origin allowlist and hosting env/deployment, real-browser password change/deletion, and third-party-cookie-blocking browsers. Password reset in neon mode is not implemented.
 
 ## Live Neon verification (2026-11-25)
 

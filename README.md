@@ -18,7 +18,7 @@ Arabic-first (RTL) learning platform where junior developers build, test, deploy
 - Analytics (PostHog): [`docs/analytics/posthog-setup.md`](docs/analytics/posthog-setup.md) · Payments (Paymob): [`docs/payments/paymob.md`](docs/payments/paymob.md)
 - What is built and what is not: [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md)
 - Decisions and open owner questions: [`DECISIONS.md`](DECISIONS.md)
-- Zero-cost beta setup (Render Free + Neon Free, social sign-in): [`deploy/RENDER_FREE.md`](deploy/RENDER_FREE.md)
+- Zero-cost beta setup (Render Free + Neon Free, email sign-in via Neon Auth): [`deploy/RENDER_FREE.md`](deploy/RENDER_FREE.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`docs/roadmap.md`](docs/roadmap.md) · Acceptance criteria: [`docs/acceptance-criteria.md`](docs/acceptance-criteria.md)
 
 ## Stack
@@ -61,7 +61,7 @@ Make an existing user an admin: `pnpm --filter @pb/api make-admin you@example.co
 
 ### Neon (database provisioning only)
 
-`neon init` / `neon deploy` provision the Postgres database declared in `neon.ts` (Postgres only, no Neon Auth). They do **not** host the app; hosting is Render ([`deploy/RENDER_FREE.md`](deploy/RENDER_FREE.md)). `neon init` writes `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) to the root `.env.local` (gitignored).
+`neon init` / `neon deploy` provision the Postgres database declared in `neon.ts` (Postgres + Neon Auth). They do **not** host the app; hosting is Render ([`deploy/RENDER_FREE.md`](deploy/RENDER_FREE.md)). `neon init` writes `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) to the root `.env.local` (gitignored).
 
 API `dev`, `start`, `db:seed`, `content:import`, `make-admin`, `payments:reconcile`, `analytics:purge` and root `render:start` load `apps/api/.env` → root `.env` → root `.env.local` (later wins; shell/host env always wins), so the root Neon URL overrides the local Docker one. Delete or rename root `.env.local` to go back to Docker.
 

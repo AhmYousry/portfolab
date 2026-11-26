@@ -109,6 +109,44 @@ export async function issueDeletionGrant(input: {
   })
 }
 
+export const NEON_REAUTH_WINDOW_MS = 5 * 60 * 1000
+
+export function neonReauthRequired() {
+  return new HttpError(403, 'REAUTH_REQUIRED', 'محتاج تأكد كلمة المرور من جديد قبل ما تمسح الحساب.')
+}
+
+// Neon mode: the caller has already verified the JWT and the upstream session row. Deletion needs
+// that session to belong to this user's mapped identity and to have been created by a sign-in
+// within the window. The Neon identity row stays as a tombstone.
+export async function deleteWithNeonProof(input: {
+  userId: string
+  sessionId: string
+  subject: string
+  upstreamCreatedAt: Date
+}) {
+  if (input.upstreamCreatedAt.getTime() < Date.now() - NEON_REAUTH_WINDOW_MS) {
+    throw neonReauthRequired()
+  }
+  await prisma.$transaction(async (tx) => {
+    const identity = await tx.neonAuthIdentity.findUnique({
+      where: { userId: input.userId },
+      select: { subject: true },
+    })
+    if (!identity || identity.subject !== input.subject) throw neonReauthRequired()
+    const live = await tx.session.count({
+      where: {
+        id: input.sessionId,
+        userId: input.userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        user: { deletedAt: null },
+      },
+    })
+    if (live !== 1) throw neonReauthRequired()
+    await anonymizeUser(tx, input.userId)
+  })
+}
+
 // Claims the grant and anonymizes in one transaction: a replayed, expired, foreign, or
 // other-session grant rolls everything back.
 export async function deleteWithGrant(input: { userId: string; sessionId: string; token: string }) {

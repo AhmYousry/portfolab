@@ -16,8 +16,16 @@ const envSchema = z.object({
   DATABASE_URL: z.string().startsWith('postgresql://'),
   AUTH_MODE: z.preprocess(
     (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
-    z.enum(['password', 'social']).default('password'),
+    z.enum(['password', 'social', 'neon']).default('password'),
   ),
+  NEON_AUTH_BASE_URL: optionalSecret,
+  NEON_AUTH_JWKS_URL: optionalSecret,
+  NEON_AUTH_JWT_ISSUER: optionalSecret,
+  NEON_AUTH_JWT_AUDIENCE: optionalSecret,
+  NEON_AUTH_REQUIRE_EMAIL_VERIFIED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   WEB_DIST_DIR: optionalSecret,
   CORS_ORIGINS: z
     .string()

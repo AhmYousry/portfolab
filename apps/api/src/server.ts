@@ -3,6 +3,7 @@ import { prisma } from './db.js'
 import { env } from './env.js'
 import { AuthModeConfigError, configureAuthMode, resolveAuthRuntime } from './services/auth-mode.js'
 import { drainMailDeliveries, setMailer } from './services/mailer.js'
+import { NeonAuthConfigError, configureNeonAuth } from './services/neon-auth.js'
 import { OAuthConfigError, configureOAuth } from './services/oauth.js'
 import { shutdownAnalytics } from './services/product-analytics.js'
 import { MailerConfigError } from './services/resend-mailer.js'
@@ -13,13 +14,15 @@ try {
   const runtime = resolveAuthRuntime(env)
   setMailer(runtime.mailer)
   configureOAuth({ config: runtime.oauth })
+  configureNeonAuth({ config: runtime.neon })
   configureAuthMode(runtime.mode)
   console.info(`[api] auth mode: ${runtime.mode}`)
 } catch (err) {
   const known =
     err instanceof MailerConfigError ||
     err instanceof OAuthConfigError ||
-    err instanceof AuthModeConfigError
+    err instanceof AuthModeConfigError ||
+    err instanceof NeonAuthConfigError
   console.error(known ? err.message : 'Invalid auth configuration')
   process.exit(1)
 }

@@ -1,9 +1,10 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AuthCapabilities, PublicUser } from '@pb/shared'
+import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { AuthCapabilities, NeonProof, PublicUser } from '@pb/shared'
 import { useEffect, useRef } from 'react'
-import { analytics } from './analytics'
+import { analytics, getUtm } from './analytics'
 import { api } from './api'
 import { type ConsentState, getConsent } from './consent'
+import { neonSignOut } from './neon-auth'
 
 export const ME_KEY = ['me'] as const
 export const AUTH_CAPABILITIES_KEY = ['auth-capabilities'] as const
@@ -27,6 +28,28 @@ export function useAuthCapabilities() {
     queryKey: [...AUTH_CAPABILITIES_KEY, user?.id ?? null],
     queryFn: () => api.get<AuthCapabilities>('/api/auth/oauth/providers'),
     staleTime: CAPABILITIES_STALE_MS,
+  })
+}
+
+function cachedNeonAuthUrl(qc: QueryClient): string | null {
+  const entries = qc.getQueriesData<AuthCapabilities>({ queryKey: AUTH_CAPABILITIES_KEY })
+  for (const [, data] of entries) {
+    if (data?.mode === 'neon' && data.neonAuthUrl) return data.neonAuthUrl
+  }
+  return null
+}
+
+// Exchanges a Neon Auth session for a local API session. The server re-verifies everything.
+export function exchangeNeonSession(
+  proof: NeonProof,
+  intent: 'login' | 'signup',
+  acceptPrivacy = false,
+) {
+  return api.post<{ user: PublicUser; created: boolean }>('/api/auth/neon/session', {
+    ...proof,
+    intent,
+    ...(acceptPrivacy ? { acceptPrivacy: true } : {}),
+    ...(intent === 'signup' ? { utm: getUtm() } : {}),
   })
 }
 
@@ -80,7 +103,12 @@ export function useAuthActions() {
       void syncConsentToServer()
     },
     logout: async () => {
-      await api.post('/api/auth/logout')
+      const neonUrl = cachedNeonAuthUrl(qc)
+      try {
+        await api.post('/api/auth/logout')
+      } finally {
+        if (neonUrl) await neonSignOut(neonUrl)
+      }
       analytics.capture('logged_out', { source: 'nav' })
       analytics.reset()
       qc.setQueryData(ME_KEY, null)

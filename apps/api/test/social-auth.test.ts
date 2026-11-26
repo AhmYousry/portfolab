@@ -202,6 +202,7 @@ describe('auth capabilities discovery', () => {
       passwordAuth: true,
       providers: [],
       linkedProviders: null,
+      neonAuthUrl: null,
     })
     expect(res.headers['cache-control']).toContain('no-store')
   })
@@ -220,6 +221,7 @@ describe('auth capabilities discovery', () => {
       passwordAuth: false,
       providers: ['google', 'github'],
       linkedProviders: null,
+      neonAuthUrl: null,
     })
 
     configureAuthMode('password')

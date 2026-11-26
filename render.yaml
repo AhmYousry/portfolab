@@ -16,7 +16,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: AUTH_MODE
-        value: social
+        value: neon
       - key: WEB_DIST_DIR
         value: ../web/dist
       - key: CONTENT_DIR
@@ -39,6 +39,17 @@ services:
         sync: false
       - key: DIRECT_DATABASE_URL
         sync: false
+      # Required for AUTH_MODE=neon. Public Neon Auth URL (not a secret); missing/non-https stops the service.
+      - key: NEON_AUTH_BASE_URL
+        sync: false
+      # Optional Neon Auth JWT overrides; leave empty to use defaults derived from NEON_AUTH_BASE_URL.
+      - key: NEON_AUTH_JWKS_URL
+        sync: false
+      - key: NEON_AUTH_JWT_ISSUER
+        sync: false
+      - key: NEON_AUTH_JWT_AUDIENCE
+        sync: false
+      # Optional legacy AUTH_MODE=social only; ignored in neon mode. Leave empty.
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

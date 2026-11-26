@@ -8,6 +8,7 @@ import { accountRouter } from './routes/account.js'
 import { adminRouter } from './routes/admin.js'
 import { authRouter } from './routes/auth.js'
 import { checkoutRouter } from './routes/checkout.js'
+import { neonAuthRouter } from './routes/neon-auth.js'
 import { oauthRouter } from './routes/oauth.js'
 import { publicRouter } from './routes/public.js'
 import { resourcesRouter } from './routes/resources.js'
@@ -15,6 +16,7 @@ import { studentRouter } from './routes/student.js'
 import { webhooksRouter } from './routes/webhooks.js'
 import { csrfProtection } from './security/csrf.js'
 import { loadSession } from './security/session.js'
+import { neonAuthConfig } from './services/neon-auth.js'
 import { webHandlers } from './web-static.js'
 
 const JSON_LIMIT = '32kb'
@@ -41,6 +43,7 @@ export interface AppOptions {
 
 export function createApp(options: AppOptions = {}) {
   const web = options.webDistDir ? webHandlers(options.webDistDir) : null
+  const neon = neonAuthConfig()
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', env.isProd ? 1 : false)
@@ -51,6 +54,7 @@ export function createApp(options: AppOptions = {}) {
         directives: {
           'img-src': ["'self'", 'data:', 'https:'],
           'frame-ancestors': ["'none'"],
+          ...(neon ? { 'connect-src': ["'self'", new URL(neon.baseUrl).origin] } : {}),
         },
       },
     }),
@@ -71,6 +75,7 @@ export function createApp(options: AppOptions = {}) {
   const api = express.Router()
   api.use(publicRouter)
   api.use('/auth/oauth', oauthRouter)
+  api.use('/auth/neon', neonAuthRouter)
   api.use('/auth', authRouter)
   api.use(studentRouter)
   api.use(resourcesRouter)
