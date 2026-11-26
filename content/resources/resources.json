@@ -14,7 +14,7 @@
     "key": "taskflow-prompts",
     "projectSlug": "taskflow-lite",
     "title": "10 AI mentor prompts (F01–F10)",
-    "description": "Prompts عملية بتخلي الـ AI يعلمك ويراجعك بدل ما يكتب المشروع مكانك.",
+    "description": "Prompts بالإنجليزي تعدّلها على مشروعك، والـ AI ينفذ خطوة صغيرة ويشرحلك كل تغيير، وانت تجرب كل نتيجة بنفسك.",
     "type": "PROMPTS",
     "storageKey": "taskflow-lite/ai-prompts.md",
     "tier": "FREE",

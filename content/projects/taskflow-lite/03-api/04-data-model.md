@@ -7,123 +7,135 @@ status: PUBLISHED
 checkpoints:
   - key: task-model
     title: الـ Task model والـ enums موجودين
-    instructions: '`server/prisma/schema.prisma` فيه enums لـ TaskStatus وTaskPriority وmodel اسمه Task فيه كل الحقول المطلوبة.'
+    instructions: '`server/prisma/schema.prisma` فيه enum `TaskStatus` (TODO, IN_PROGRESS, DONE) وenum `TaskPriority` (LOW, MEDIUM, HIGH) وmodel `Task` فيه id, title, description, status, priority, dueDate, createdAt, updatedAt.'
   - key: migration-applied
-    title: الـ migration اتعملت واتعمل لها commit
-    instructions: شغلت `npm run db:migrate --workspace server -- --name add-task` ولقيت فولدر جديد جوه `server/prisma/migrations`. الفولدر ده لازم يدخل Git.
+    title: الـ migration اتعملت وظاهرة في Prisma Studio
+    instructions: من فولدر المشروع الرئيسي شغلت `npm run db:migrate --workspace server -- --name add-task`، ولقيت فولدر جديد جوه `server/prisma/migrations` (لازم يدخل Git)، وجدول `Task` ظاهر في Prisma Studio على http://localhost:5555.
   - key: justify-fields
     title: بررت كل حقل
-    instructions: في `docs/data-model.md` اكتب لكل حقل نوعه، هل هو required، الـ default بتاعه، وليه.
+    instructions: في `docs/data-model.md` جدول فيه لكل حقل - نوعه، required ولا لأ، الـ default، وسبب في سطر.
 ---
 
-## الهدف من الدرس
+## الهدف
 
-تكتب Prisma schema لجدول `Task`، تعمل migration، وتقدر تبرر كل حقل.
+تعمل جدول `Task` حقيقي في PostgreSQL، وتشوفه بعينك، وتقدر تبرر كل حقل فيه.
 
-**الوقت المتوقع:** 50 دقيقة.
+**هتشوف في الآخر:** Prisma Studio في المتصفح على http://localhost:5555 فيه جدول **Task** فاضي (0 records) بالأعمدة اللي اخترتها.
 
-## المشكلة
+**الوقت:** حوالي 50 دقيقة.
 
-لو صممت الـ data model غلط، كل اللي فوقه هيتعب. مثال: لو خزنت الـ status كـ text حر، هتلاقي في الداتابيز `"done"` و`"Done"` و`"DONE "` و`"خلصت"`. الفلترة هتبوظ.
+**الحالة دلوقتي بصراحة:** http://localhost:3001/api/tasks هيفضل يرجع `Not implemented yet` حتى بعد الدرس ده. الجدول هيبقى موجود، بس الـ routes لسه في Module 3 الدرس التالت.
 
-## فكر الأول، اكتب بعدين
+**ثوابت لازم تلتزم بيها** (الـ acceptance tests في `server/test/tasks.test.js` بتعتمد عليها):
 
-قبل الكود، املى الجدول ده بنفسك (ده نفس محتوى الـ worksheet في صفحة الملفات):
-
-| الحقل | النوع | Required؟ | Default | ليه |
-|---|---|---|---|---|
-| id | ? | | | |
-| title | ? | | | |
-| description | ? | | | |
-| status | ? | | | |
-| priority | ? | | | |
-| dueDate | ? | | | |
-| createdAt / updatedAt | ? | | | |
-
-أسئلة تسألها لنفسك:
-
-- هل الـ `id` يبقى رقم بيزيد (1, 2, 3) ولا string عشوائي؟ (تلميح: IDs بتزيد بتكشف عدد المهام وسهل تخمينها.)
-- الـ `dueDate`: محتاج وقت ولا تاريخ بس؟
-- إيه الحد الأقصى المعقول لطول العنوان؟
+- `id` لازم يبقى **string** (مش رقم بيزيد).
+- `title` أقصاه 120 حرف. `description` اختياري.
+- `status` الافتراضي `TODO`، و`priority` الافتراضي `MEDIUM`.
+- `dueDate` اختياري وتاريخ بس من غير وقت.
 
 ## الخطوات
 
-### 1. الـ enums
+### 1. قرر الحقول وبررها
 
-الـ enum بيخلي الداتابيز نفسها ترفض أي قيمة غير المسموحة:
+**فين:** AI chat، بعدين المحرر ← ملف جديد `docs/data-model.md`.
 
-```prisma
-enum TaskStatus {
-  TODO
-  IN_PROGRESS
-  DONE
-}
+**إنت تختار:** حقل زيادة نفسك تضيفه (مثلًا `tags` أو `category` أو `reminderAt`). الـ AI هيقولك تضيفه دلوقتي ولا لأ وليه.
+
+```text prompt=TF04-1
+I'm designing the Task table for TaskFlow Lite (Prisma 6 + PostgreSQL). Fixed rules from my acceptance tests: id is a string, title is required and max 120 characters, description is optional, status is TODO/IN_PROGRESS/DONE with default TODO, priority is LOW/MEDIUM/HIGH with default MEDIUM, dueDate is an optional calendar date without time, plus createdAt and updatedAt.
+An extra field I'm tempted to add: {{One extra field you are tempted to add}}.
+
+Give me a Markdown table with columns: field | type | required? | default | why (one line). Then tell me in 2 lines whether my extra field belongs in version 1, and what a later migration for it would look like (no code).
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, field names and types in English.
+- No code yet; just the table and the short answer.
+- Stop at the end and wait for me to verify.
 ```
 
-اكتب `TaskPriority` بنفس الشكل (LOW, MEDIUM, HIGH).
+**المتوقع:** جدول فيه 8 حقول + رأي في الحقل الزيادة.
 
-### 2. الـ model
+**اتأكد بنفسك:** الصق الجدول في `docs/data-model.md`، وعدل عمود "why" بكلامك. لازم تقدر تجاوب: ليه الـ `id` string؟ (الأرقام اللي بتزيد سهل تتخمن وبتكشف عدد المهام.)
 
-جرب تكتبه بنفسك الأول. لما تخلص (أو تتزنق)، قارن بالحل:
+**وقف لو:** الجدول فيه `userId` أو جدول تاني. ده out of scope.
 
-```prisma spoiler
-// server/prisma/schema.prisma
-model Task {
-  id          String       @id @default(cuid())
-  title       String       @db.VarChar(120)
-  description String?      @db.VarChar(2000)
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
-  dueDate     DateTime?    @db.Date
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+### 2. اكتب الـ schema
 
-  @@index([status])
-  @@index([priority])
-  @@index([dueDate])
-}
+**فين:** المحرر ← `server/prisma/schema.prisma` (الملف فيه TODO بيقولك المطلوب).
+
+**إنت تختار:** نوع الـ ID: `cuid` أو `uuid`. الاتنين strings ومقبولين. الافتراضي في الحل المرجعي: `cuid`.
+
+```text prompt=TF04-2
+I'm on the "data-model" step of TaskFlow Lite. Edit only server/prisma/schema.prisma (it already has the generator, the datasource and a TODO comment).
+ID strategy I chose: {{cuid or uuid}}.
+
+Add:
+- enum TaskStatus { TODO IN_PROGRESS DONE } and enum TaskPriority { LOW MEDIUM HIGH }
+- model Task with: id (String, my ID strategy), title (VarChar 120), description (optional, VarChar 2000), status (default TODO), priority (default MEDIUM), dueDate (optional, @db.Date), createdAt (default now), updatedAt (@updatedAt)
+- indexes on status, priority and dueDate
+Explain each attribute (@id, @default, @db.VarChar, @db.Date, @updatedAt, @@index) in one short line.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Touch only server/prisma/schema.prisma; keep the generator and datasource blocks as they are.
+- If you can edit my files, show the diff. If you can't, give me the exact final content of this one file.
+- Don't run any migration yet, and never say you ran something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-نقط مهمة في الحل:
+**المتوقع:** الملف فيه 2 enums وmodel واحد، ومفيش أي حاجة اتغيرت في `generator` و`datasource`.
 
-- `cuid()`: ID عشوائي مش سهل يتخمن ومفيش collision عملي.
-- `@db.VarChar(120)`: الداتابيز نفسها بتحمي من عنوان طوله 10 ميجا، حتى لو الـ API فيه bug.
-- `@db.Date`: تاريخ بس من غير وقت، عشان منتعبش مع الـ time zones.
-- `@updatedAt`: Prisma بيحدثه أوتوماتيك.
-- الـ indexes على الحقول اللي بنفلتر ونرتب بيها.
+**اتأكد بنفسك:** في terminal جوه فولدر `server` شغل `npx prisma validate`. لازم يقول إن الـ schema valid.
 
-### 3. اعمل migration
+**وقف لو:** الـ AI عايز يغير `datasource` أو يضيف جداول تانية.
+
+### 3. اعمل الـ migration وشوف الجدول
+
+**فين:** terminal في فولدر المشروع الرئيسي (والـ `db` في Docker شغال)، بعدين المحرر، بعدين المتصفح.
+
+**إنت تختار:** اسم الـ migration. الافتراضي `add-task`. خليه وصف قصير بالإنجليزي من غير مسافات.
 
 ```bash
 npm run db:migrate --workspace server -- --name add-task
 ```
 
-افتح ملف الـ SQL اللي اتعمل جوه `server/prisma/migrations/`. **اقرأه.** ده الـ SQL الحقيقي اللي اتنفذ. لازم تفهم `CREATE TYPE` و `CREATE TABLE` و `CREATE INDEX`.
+بعدين افتح ملف `migration.sql` اللي اتعمل جوه `server/prisma/migrations/<timestamp>_add-task/` في المحرر.
 
-## أخطاء شائعة
+```text prompt=TF04-3
+I ran `npm run db:migrate --workspace server -- --name {{Your migration name}}` in the root of TaskFlow Lite.
+Here is the generated migration.sql (it contains no secrets):
+{{Paste your migration.sql}}
 
-- **تعديل migration قديمة بعد ما اتطبقت:** متعملش كده. اعمل migration جديدة.
-- **نسيان commit لفولدر الـ migrations:** من غيره، أي حد يعمل clone مش هيقدر يبني نفس الداتابيز.
-- **استخدام `prisma db push` في الإنتاج:** `db push` للتجربة السريعة بس. في الإنتاج بنستخدم `migrate deploy`.
-- **`Float` للفلوس:** مش موجود هنا، بس افتكره لـ ExpensePilot. الفلوس بتتخزن integers (قروش).
+Explain in plain words what each CREATE TYPE, CREATE TABLE and CREATE INDEX line does to my database.
+Then tell me: why this migrations folder must be committed to Git, and why I should never edit a migration after it has been applied.
 
-## AI mentor prompt (F03)
-
-```text prompt=F03
-Help me design a Prisma Task model with status, priority and due date. Explain field types, defaults, validation and migration risks. Ask me to justify each field.
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep SQL, file paths and commands in English.
+- Do this step only. Don't change any files.
+- Never say you ran something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-## Tradeoff تكتبه
+**المتوقع:** الـ terminal بيقول إن الـ migration اتطبقت، وفي فولدر جديد جوه `server/prisma/migrations`.
 
-في `docs/data-model.md`: "اخترت `cuid()` بدل autoincrement لأن ..." أو أي قرار تاني اتخذته.
-
-## Stretch goal
-
-إيه اللي يحصل لو عايز تضيف حقل `tags` بعدين؟ اكتب migration plan من غير ما تنفذه: هل محتاج جدول تاني؟ ليه؟
-
-## Git commit
+**اتأكد بنفسك:** في terminal جوه فولدر `server`:
 
 ```bash
-git add server/prisma
+npx prisma studio
+```
+
+افتح http://localhost:5555. لازم تشوف موديل **Task** ولما تفتحه يبقى فاضي بالأعمدة اللي كتبتها. اقفل Studio بـ `Ctrl+C` لما تخلص.
+
+**وقف لو:** الـ migration فشلت بـ `Can't reach database server`. اتأكد إن `docker compose ps` بيقول `running` قبل ما تجرب تاني.
+
+```bash
+git add server/prisma docs/data-model.md
 git commit -m "feat(db): add Task model, enums and indexes"
 ```
+
+## ملاحظات تقنية (اختياري)
+
+- **ليه enum مش text؟** من غيره هتلاقي في الداتابيز `"done"` و`"Done"` و`"DONE "`، والفلترة هتبوظ. الـ enum بيخلي الداتابيز نفسها ترفض أي قيمة تانية.
+- **`@db.VarChar(120)`:** حماية من الداتابيز نفسها حتى لو الـ API فيه bug.
+- **`@db.Date`:** تاريخ من غير وقت، عشان متتعبش مع الـ time zones.
+- **`prisma db push`** للتجربة السريعة بس. في الإنتاج بنستخدم `migrate deploy` (هتشوفه في درس الـ deploy).

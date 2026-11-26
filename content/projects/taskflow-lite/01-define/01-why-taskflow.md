@@ -7,100 +7,111 @@ isPreview: true
 status: PUBLISHED
 checkpoints:
   - key: user-stories
-    title: كتبت 5 user stories على الأقل
-    instructions: اكتب في ملف `docs/scope.md` في الـ repo بتاعك 5 user stories بصيغة "كـ ... عايز ... عشان ...". كل story لازم يبقى ليها acceptance criteria واحد على الأقل تقدر تختبره.
+    title: عندك 5 user stories على الأقل
+    instructions: عندك 5 user stories بصيغة "As a ... I want ... so that ..."، ولكل واحدة acceptance check واحد تقدر تشوفه بعينك في المتصفح. احفظهم في ورقة أو notes أو في المحادثة نفسها. لسه مش محتاج repo؛ هتنقلهم للمشروع في درس "جهز الـ workspace".
   - key: out-of-scope
     title: كتبت قائمة "مش هعمله دلوقتي"
-    instructions: في نفس الملف، اكتب 3 حاجات على الأقل قررت متعملهاش في النسخة دي (مثلًا login أو مشاركة المهام) وسبب كل واحدة في سطر.
+    instructions: في نفس الـ notes، اكتب 3 حاجات على الأقل قررت متعملهاش في النسخة دي (زي login أو مشاركة المهام) وسبب كل واحدة في سطر.
 ---
 
-## الهدف من الدرس
+## الهدف
 
-في آخر الدرس ده هيكون عندك **scope مكتوب** لمشروع TaskFlow Lite: user stories، acceptance criteria، وقائمة واضحة بالحاجات اللي **مش** هتعملها. ده أول ملف في الـ repo بتاعك، وأول حاجة الإنترفيور ممكن يسألك عنها.
+تخرج من الدرس ده وإنت عارف **بالظبط** إنت بتبني إيه: 5 user stories، قائمة حاجات مش هتعملها، ورسمة بسيطة على ورقة للشاشة.
 
-**المتطلبات:** تعرف أساسيات JavaScript وHTML/CSS وGit.
-**الوقت المتوقع:** حوالي 35 دقيقة.
+**هتشوف في الآخر:** ورقة (أو notes) فيها 5 stories + 3 حاجات out of scope + sketch للصفحة الوحيدة في التطبيق.
 
-## المشكلة
+**الوقت:** حوالي 35 دقيقة. **مش محتاج:** كود، repo، أو تسطيب أي حاجة.
 
-أحمد عنده 17 calculator app على GitHub. كلهم شبه بعض، وكلهم frontend بس. لما الإنترفيور سأله "الداتا بتتخزن فين؟" سكت.
-
-المشكلة مش إن أحمد مش شاطر. المشكلة إنه دايمًا بيبدأ بالكود قبل ما يحدد هو بيبني إيه. النتيجة: مشاريع ملهاش نهاية واضحة، ومفيش حاجة يقدر يشرحها.
-
-**TaskFlow Lite** مشروع صغير بالقصد: task manager لشخص واحد. صغير كفاية إنك تخلصه، وكامل كفاية إنه يلمس كل طبقة في أي تطبيق full stack حقيقي:
-
-- **Frontend** بيعرض ويجمع البيانات من المستخدم.
-- **API** بيتأكد إن البيانات سليمة وبيقرر يرد بإيه.
-- **Database** بتحفظ البيانات بحيث متضيعش لما تعمل refresh.
-
-## ليه نبدأ بالـ scope؟
-
-لأن كل قرار تقني بعد كده بيعتمد عليه. لو مش عارف هل في "due date" ولا لأ، مش هتعرف تصمم الـ database. ولو مش عارف هل في login ولا لأ، مش هتعرف تقدر حجم الشغل.
-
-الـ scope كمان بيحميك من **scope creep**: إنك كل شوية تضيف feature جديدة ومتخلصش أبدًا.
+> **إزاي تستخدم الـ prompts:** انسخ الـ prompt زي ما هو في أي AI chat بتستخدمه (حتى لو مجاني). اللي بين `{{ }}` إنت لازم تغيره بكلامك **بالإنجليزي**. متلصقش أي باسوردات أو بيانات شخصية.
 
 ## الخطوات
 
-### 1. اكتب الـ user stories
+### 1. اكتب الـ user stories مع الـ AI
 
-الصيغة: **كـ [مين] عايز [إيه] عشان [ليه]**. الـ "ليه" مهمة؛ هي اللي بتخليك تفرق بين feature مهمة وfeature "حلوة وخلاص".
+**فين:** AI chat.
 
-أمثلة للبداية (اكتب نسختك بكلامك):
+**إنت تختار:** مين هيستخدم التطبيق ومشكلته إيه. أمثلة: `a university student` + `I forget assignment deadlines`، أو `a freelance designer` + `I lose track of client revisions`.
 
-1. كمستخدم، عايز أضيف task بعنوان، عشان مانساش الحاجات اللي ورايا.
-2. كمستخدم، عايز أحدد priority وdue date، عشان أعرف أبدأ بإيه.
-3. كمستخدم، عايز أعلم على الـ task إنها خلصت، عشان أشوف أنا ماشي فين.
-4. كمستخدم، عايز أدور وأفلتر المهام، عشان ألاقي اللي محتاجه بسرعة.
-5. كمستخدم، عايز المهام تفضل موجودة بعد ما أقفل المتصفح، عشان أقدر أعتمد على التطبيق.
+```text prompt=TF01-1
+I'm planning TaskFlow Lite: a personal task manager for ONE user, built later with React, Express and PostgreSQL. I'm a beginner who knows basic JavaScript.
+The person who will use it: {{Who will use your app}}.
+Their main problem today: {{The problem in one sentence}}.
 
-### 2. حط acceptance criteria لكل story
+Give me exactly 5 user stories in the format "As a ..., I want ..., so that ...". Each story must fit a single-page app with: add a task (title, optional description, priority, due date), mark it done, edit, delete, search and filter.
+Under each story add ONE acceptance check I can see in the browser, for example: "submitting an empty title shows an error under the field".
 
-الـ acceptance criteria لازم تبقى **حاجة تقدر تشوفها أو تختبرها**، مش إحساس.
-
-| Story | Acceptance criteria |
-|---|---|
-| إضافة task | لو العنوان فاضي، الفورم يرفض ويقول السبب. لو سليم، الـ task تظهر في الليستة. |
-| خلصت | الضغط على checkbox يغير الحالة لـ DONE، ولما أعمل refresh تفضل DONE. |
-| فلترة | اختيار priority = HIGH يعرض الـ HIGH بس. |
-
-### 3. اكتب اللي مش هتعمله
-
-ده جزء محترفين كتير بيتجاهلوه. في النسخة دي **مش** هنعمل:
-
-- تسجيل دخول وحسابات (التطبيق لمستخدم واحد).
-- مشاركة المهام مع ناس تانية.
-- إشعارات وتذكيرات.
-- Pagination (ليستة شخصية مش هتوصل لآلاف المهام).
-
-كتابة ده بتخليك تقدر تقول في الإنترفيو: "اخترت متعملش X لأن Y، ولو هكبر المشروع هبدأ بـ Z". ده كلام Junior فاهم.
-
-## النتيجة المتوقعة
-
-ملف `docs/scope.md` فيه حوالي صفحة واحدة: 5+ user stories، acceptance criteria، وقائمة out-of-scope.
-
-## أخطاء شائعة
-
-- **Stories تقنية:** "عايز أعمل POST endpoint" مش user story. المستخدم مش عارف يعني إيه endpoint.
-- **Acceptance criteria مبهمة:** "الفورم يبقى سهل" مينفعش تختبره. "الفورم يعرض رسالة خطأ تحت الحقل الفاضي" ينفع.
-- **Scope كبير:** لو لقيت نفسك كاتب 15 story، اختار أهم 5–7 والباقي out of scope.
-
-## AI mentor prompt (F01)
-
-استخدم الـ prompt ده مع أي AI assistant. لاحظ إنه بيطلب أسئلة الأول ومش بيطلب كود:
-
-```text prompt=F01
-Act as a senior full-stack mentor. I know basic JavaScript. Help me scope TaskFlow Lite into a buildable MVP. Ask up to 5 clarifying questions, then give user stories, out-of-scope features, and an acceptance checklist. Don't write the app for me.
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep technical terms in English.
+- No code and no files yet. Keep it short.
+- Don't guess my answers; ask me instead.
+- Stop at the end and wait for my reply.
 ```
 
-بعد ما يرد، **قارن** رده باللي كتبته. متنسخش. لو اقترح حاجة مش مقتنع بيها، اكتب ليه رفضتها.
+**المتوقع:** 5 stories، تحت كل واحدة check واحد.
 
-## Stretch goal
+**اتأكد بنفسك:** اقرا كل check واسأل: "أقدر أشوف ده بعيني في المتصفح؟" لو الإجابة لأ (زي "الفورم يبقى سهل")، اطلب من الـ AI يعيد صياغته.
 
-ارسم wireframe على ورقة (أو Excalidraw) لصفحة واحدة: فورم فوق، فلاتر، وليستة المهام. صوره وحطه في `docs/wireframe.png`.
+**وقف لو:** الـ AI كتب كود أو اقترح login وحسابات. قوله: `No code and no login. Single user only.`
 
-## Git commit
+### 2. اكتب اللي **مش** هتعمله
 
-```bash
-git add docs/scope.md
-git commit -m "docs: define TaskFlow Lite MVP scope and user stories"
+**فين:** نفس الـ AI chat.
+
+**إنت تختار:** feature واحدة نفسك تضيفها. أمثلة: `email reminders`، `sharing tasks with friends`، `dark mode`.
+
+```text prompt=TF01-2
+Now help me write an "out of scope" list for version 1 of TaskFlow Lite.
+A feature I'm tempted to add: {{One feature you are tempted to add}}.
+
+Give me 3 to 5 features I should NOT build now (include mine), each with a one-line reason a junior developer could say in an interview. Login/accounts must be on the list because the app is for one user.
+Then tell me in one sentence which ONE of them you would build first in version 2 and why.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep technical terms in English.
+- No code and no files yet. Keep it short.
+- Stop at the end and wait for my reply.
 ```
+
+**المتوقع:** ليستة قصيرة، كل بند معاه سبب في سطر.
+
+**اتأكد بنفسك:** اقرا السبب بصوت عالي كأنك في إنترفيو: "مش هعمل X دلوقتي لأن Y". لو مش مقتنع بسبب، غيره بكلامك.
+
+**وقف لو:** الليستة طلعت أطول من الـ stories نفسها. اختار أهم 3.
+
+### 3. ارسم الشاشة على ورقة
+
+**فين:** ورقة وقلم (أو Excalidraw مجاني في المتصفح).
+
+**إنت تختار:** ترتيب الحاجات في الصفحة. الشكل اللي هنبنيه في الآخر: فورم "New task" فوق، بعده فلاتر (Search / Status / Priority / Sort)، وتحتهم ليستة المهام.
+
+```text prompt=TF01-3
+I'm sketching the single page of TaskFlow Lite on paper before writing any code.
+My layout from top to bottom: {{Your layout, e.g. form, filters, task list}}.
+
+Review my layout against my 5 user stories above. Tell me:
+1. Which story has no visible place on the page yet.
+2. What the page should show when there are no tasks, while loading, and when the server is down (one short line each).
+3. One thing to remove to keep version 1 small.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep technical terms in English.
+- No code and no files yet. Keep it short.
+- Stop at the end and wait for my reply.
+```
+
+**المتوقع:** ملاحظات قصيرة على الرسمة + جملة لكل حالة (فاضي / بيحمل / فيه مشكلة).
+
+**اتأكد بنفسك:** حط صباعك على كل story وشاور على مكانها في الرسمة. لو story ملهاش مكان، ضيفلها مكان أو شيلها.
+
+**وقف لو:** رسمت أكتر من صفحة واحدة. TaskFlow Lite صفحة واحدة بس.
+
+## خلصت الدرس لما
+
+- عندك 5 stories بـ checks تتشاف بالعين.
+- عندك 3 حاجات out of scope بأسبابها.
+- عندك رسمة واحدة للصفحة. صورها بالموبايل؛ هتحتاجها في الـ README بعدين.
+
+## ملاحظات تقنية (اختياري)
+
+- **ليه scope قبل الكود؟** كل قرار بعد كده (الداتابيز، الـ API، الفورم) مبني عليه. من غيره هتقع في **scope creep**: كل يوم feature جديدة ومفيش نهاية.
+- **Story تقنية مش story:** "I want a POST endpoint" ده مش كلام مستخدم. المستخدم ميعرفش يعني إيه endpoint.

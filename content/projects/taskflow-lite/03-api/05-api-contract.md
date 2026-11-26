@@ -7,130 +7,134 @@ status: PUBLISHED
 checkpoints:
   - key: contract-written
     title: كتبت الـ API contract
-    instructions: '`docs/api.md` فيه الخمس endpoints، ولكل واحد request، response ناجح، وأخطاء محتملة بالـ status codes.'
+    instructions: '`docs/api.md` فيه الخمس endpoints، ولكل واحد - request، response ناجح، والأخطاء المحتملة بالـ status codes، وشكل الخطأ الموحد.'
   - key: schemas-done
     title: الـ Zod schemas مكتملة
-    instructions: '`server/src/tasks/task.schema.js` فيه createTaskSchema وupdateTaskSchema وlistQuerySchema حقيقيين (مفيش passthrough).'
+    instructions: '`server/src/tasks/task.schema.js` فيه createTaskSchema وupdateTaskSchema وlistQuerySchema حقيقيين (مفيش `.passthrough()`)، وفحص `node -e` في الدرس بيطبع `false` للعنوان الفاضي.'
   - key: no-defaults-on-update
     title: الـ update schema مبيطبقش defaults
-    instructions: اكتب في `docs/api.md` جملة بتشرح ليه الـ update schema مينفعش يبقى فيه defaults، واتأكد إن الكود بتاعك ماشي على كده.
+    instructions: '`updateTaskSchema.parse({ title: "Renamed" })` بيرجع `{ title: "Renamed" }` بس (من غير status ولا priority)، وكتبت في `docs/api.md` جملة بتشرح ليه.'
 ---
 
-## الهدف من الدرس
+## الهدف
 
-تتفق مع نفسك على **شكل الـ API** قبل ما تكتب أي route، وتكتب Zod schemas بتحمي الـ server من أي input غلط.
+تتفق على **شكل الـ API** قبل أي route، وتكتب الـ Zod schemas اللي بتحمي الـ server من أي input غلط.
 
-**الوقت المتوقع:** ساعة.
+**هتشوف في الآخر:** في الـ terminal، `false` لما تجرب عنوان فاضي، و`{ title: 'Renamed' }` بس لما تجرب تعديل، من غير ما الـ server يتغير.
 
-## المشكلة
+**الوقت:** حوالي ساعة.
 
-أحمد بدأ يكتب routes على طول. بعد يومين الـ frontend بيبعت `due_date` والـ backend مستني `dueDate`، والـ errors راجعة بأشكال مختلفة في كل endpoint. الـ contract بيمنع ده.
+**الحالة دلوقتي بصراحة:** الـ schemas هتبقى جاهزة، بس `/api/tasks` لسه بيرجع `Not implemented yet`. الـ routes اللي هتستخدم الـ schemas دي في الدرس الجاي.
 
-## الخطوة 1: اكتب الـ contract
+## الخطوات
 
-| Method | Path | Body / Query | Success | Errors |
-|---|---|---|---|---|
-| GET | `/api/tasks` | `?status=&priority=&search=&sort=` | `200 {data: Task[]}` | `400` فلتر غلط |
-| GET | `/api/tasks/:id` | — | `200 {data: Task}` | `404` |
-| POST | `/api/tasks` | `{title, description?, status?, priority?, dueDate?}` | `201 {data: Task}` | `400` |
-| PATCH | `/api/tasks/:id` | أي حقل من دول، واحد على الأقل | `200 {data: Task}` | `400`, `404` |
-| DELETE | `/api/tasks/:id` | — | `204` من غير body | `404` |
+### 1. اكتب الـ contract
 
-وشكل الخطأ **موحد** في كل حتة:
+**فين:** AI chat، بعدين المحرر ← ملف جديد `docs/api.md`.
 
-```json
-{
-  "error": {
-    "message": "Validation failed",
-    "details": [{ "field": "title", "message": "title is required" }]
-  }
-}
+**إنت تختار:** مثال حقيقي هيتكرر في الـ contract: عنوان مهمة وتاريخ. مثال: `Prepare portfolio README` و`2026-12-15`.
+
+```text prompt=TF05-1
+Help me write the API contract for TaskFlow Lite as a Markdown table, before any code. Use my example task: title "{{Your task title}}", dueDate "{{A due date in YYYY-MM-DD}}".
+
+Endpoints (fixed by my acceptance tests):
+- GET /api/tasks?status=&priority=&search=&sort= -> 200 {"data": Task[]}, 400 for unknown filter values. sort is one of createdAt, -createdAt, dueDate, -dueDate (default -createdAt).
+- GET /api/tasks/:id -> 200 {"data": Task}, 404
+- POST /api/tasks -> 201 {"data": Task}, 400
+- PATCH /api/tasks/:id -> 200 {"data": Task}, 400 (including an empty body), 404
+- DELETE /api/tasks/:id -> 204 with no body, 404
+Every error looks like {"error": {"message": "...", "details": [{"field": "...", "message": "..."}]}}.
+
+For each endpoint show: example request, example success response using my task, and one example error. Then explain in 2 lines why create returns 201 and delete returns 204.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, JSON, paths and status codes in English.
+- No implementation code yet; contract only.
+- Stop at the end and wait for me to verify.
 ```
 
-**ليه 201 مش 200 للـ create؟** لأن 201 معناها "اتعمل resource جديد". **ليه 204 للـ delete؟** مفيش حاجة نرجعها. دي تفاصيل بيسألوا عنها في الإنترفيو.
+**المتوقع:** جدول + أمثلة JSON فيها المهمة بتاعتك.
 
-## الخطوة 2: الـ Zod schemas
+**اتأكد بنفسك:** الصقه في `docs/api.md`. دور على `201` و`204` و`404` و`400`. لو واحد ناقص، الـ contract ناقص.
 
-Zod بيعمل حاجتين: **بيتأكد** إن البيانات سليمة، و**بينضفها** (trim مثلًا) ويرجعلك نسخة آمنة.
+**وقف لو:** الـ AI ضاف endpoints زيادة (login, users, tags). امسحها.
 
-جرب تكتب `createTaskSchema` بنفسك من الـ TODOs في الملف. المتطلبات:
+### 2. اكتب الـ create والـ update schemas
 
-- `title`: string، trim، من 1 لـ 120 حرف.
-- `description`: اختياري، ممكن `null`، أقصى 2000.
-- `status` و`priority`: من القوايم بس، وليهم defaults.
-- `dueDate`: اختياري، ممكن `null`، بصيغة `YYYY-MM-DD`.
-- أي حقل زيادة (زي `isAdmin`) يترفض: `.strict()`.
+**فين:** المحرر ← `server/src/tasks/task.schema.js` (فيه TODOs، و`STATUSES` و`PRIORITIES` و`SORTS` و`idSchema` جاهزين).
 
-```js spoiler
-// server/src/tasks/task.schema.js
-const dueDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'dueDate must be YYYY-MM-DD')
-  .refine((value) => !Number.isNaN(Date.parse(value)), 'dueDate is not a real date')
-  .nullable()
+**إنت تختار:** رسالة الخطأ اللي هتظهر لو العنوان فاضي. لازم تحتوي `title`، والأسهل: `title is required`.
 
-const taskFields = {
-  title: z.string().trim().min(1, 'title is required').max(TITLE_MAX),
-  description: z.string().trim().max(DESCRIPTION_MAX).nullable(),
-  status: z.enum(STATUSES),
-  priority: z.enum(PRIORITIES),
-  dueDate,
-}
+```text prompt=TF05-2
+I'm on the "api-contract" step of TaskFlow Lite. Edit only server/src/tasks/task.schema.js (Zod 4). Keep STATUSES, PRIORITIES, SORTS and idSchema as they are.
+My error message for an empty title: "{{Your empty-title error message}}".
 
-export const createTaskSchema = z
-  .object({
-    ...taskFields,
-    description: taskFields.description.optional(),
-    status: taskFields.status.default('TODO'),
-    priority: taskFields.priority.default('MEDIUM'),
-    dueDate: taskFields.dueDate.optional(),
-  })
-  .strict()
+Replace the two placeholder schemas:
+- createTaskSchema: title trimmed, 1..120 chars; description optional, nullable, trimmed, max 2000; status and priority from the lists with defaults TODO and MEDIUM; dueDate optional, nullable, format YYYY-MM-DD and a real date; reject unknown fields with .strict().
+- updateTaskSchema: same fields, all optional, NO defaults at all, .strict(), and reject an empty object.
+Build both from one shared fields object so the rules live in one place. Explain why update must not reuse the create schema with .partial().
 
-export const updateTaskSchema = z
-  .object(taskFields)
-  .partial()
-  .strict()
-  .refine((value) => Object.keys(value).length > 0, 'send at least one field to update')
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Touch only this file; leave listQuerySchema for the next step.
+- If you can edit my files, show the diff. If you can't, show me exactly what to replace in this one file.
+- Don't add dependencies, and never say you ran or tested something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-## الخطأ اللي وقعنا فيه إحنا نفسنا
+**المتوقع:** مفيش `.passthrough()` في الـ create والـ update، وفي object واحد مشترك للحقول.
 
-أول نسخة من الـ reference solution كانت كاتبة:
+**اتأكد بنفسك:** في terminal جوه فولدر `server`:
 
-```js
-export const updateTaskSchema = createTaskSchema.partial()
+```bash
+node -e "import('./src/tasks/task.schema.js').then((m) => console.log(m.createTaskSchema.safeParse({ title: '' }).success))"
+node -e "import('./src/tasks/task.schema.js').then((m) => console.log(m.updateTaskSchema.parse({ title: 'Renamed' })))"
 ```
 
-شكلها منطقي، صح؟ الـ test ده فضحها:
+الأول لازم يطبع `false`. التاني لازم يطبع `{ title: 'Renamed' }` **بس**. لو شفت `status: 'TODO'` جواه، الـ update schema فيه defaults، وده bug حقيقي (شوف الملاحظات تحت).
 
-```js
-it('only changes the fields that were sent', async () => {
-  const task = await createTask({ title: 'Keep me', status: 'IN_PROGRESS', priority: 'HIGH' })
-  const res = await request(app).patch(`/api/tasks/${task.id}`).send({ title: 'Renamed' })
-  expect(res.body.data).toMatchObject({ title: 'Renamed', status: 'IN_PROGRESS', priority: 'HIGH' })
-})
+**وقف لو:** الأمر طلع `SyntaxError`. اتأكد إنك جوه فولدر `server` وإن الملف اتحفظ.
+
+### 3. اكتب الـ list query schema
+
+**فين:** نفس الملف `server/src/tasks/task.schema.js`، بعدين terminal في `server`.
+
+**إنت تختار:** أقصى طول لكلمة البحث. الافتراضي في الحل المرجعي `100`.
+
+```text prompt=TF05-3
+Still in server/src/tasks/task.schema.js for TaskFlow Lite. Replace only the placeholder listQuerySchema.
+Max search length I chose: {{Your max search length}}.
+
+Rules for the query string: status optional (one of STATUSES), priority optional (one of PRIORITIES), search optional and trimmed with my max length, sort one of SORTS with default "-createdAt". Unknown values for status, priority or sort must fail so the route can return 400.
+Explain why query-string values arrive as strings and why "sort" gets a default but the others don't.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Touch only listQuerySchema in this file.
+- If you can edit my files, show the diff. If you can't, show me exactly what to replace.
+- Never say you ran or tested something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-`.partial()` بيخلي الحقول optional، **لكن الـ defaults بتفضل شغالة**. فلما تبعت `{title: 'Renamed'}`، Zod بيضيف `status: 'TODO'` و`priority: 'MEDIUM'` من عنده، والـ PATCH يرجع المهمة لـ TODO من غير ما المستخدم يطلب! عشان كده الحل بيبني الـ update schema من `taskFields` اللي من غير defaults.
+**المتوقع:** `listQuerySchema` بقى schema حقيقي.
 
-الدرس: **الـ tests مش رفاهية.** الـ bug ده كان هيوصل للمستخدمين.
+**اتأكد بنفسك:** جوه `server`:
 
-## أخطاء شائعة
-
-- **الثقة في `req.body` من غير validation:** أي حد يقدر يبعت أي حاجة.
-- **رفض الحقول الزيادة بصمت:** من غير `.strict()`، حد يبعت `{"id": "..."}` ويحاول يغير الـ ID.
-- **رسائل خطأ بتكشف تفاصيل داخلية:** الرسالة للمستخدم توصف المشكلة في الـ input بتاعه بس.
-
-## AI mentor prompt (F04)
-
-```text prompt=F04
-Help me define REST endpoints for task CRUD and filtering. For each endpoint show request, success response, validation errors and HTTP status codes. Don't implement until I approve the contract.
+```bash
+node -e "import('./src/tasks/task.schema.js').then((m) => console.log(m.listQuerySchema.parse({})))"
 ```
 
-## Git commit
+لازم يطبع `{ sort: '-createdAt' }`. ضيف في `docs/api.md` جملة بكلامك: "الـ update schema مفيهوش defaults عشان ...".
+
+**وقف لو:** فتحت `task.routes.js`. ده الدرس الجاي.
 
 ```bash
 git add docs/api.md server/src/tasks/task.schema.js
 git commit -m "feat(api): define task API contract and Zod validation"
 ```
+
+## ملاحظات تقنية (اختياري)
+
+- **الغلطة اللي وقعنا فيها إحنا:** أول نسخة من الحل المرجعي كانت `updateTaskSchema = createTaskSchema.partial()`. `.partial()` بيخلي الحقول optional، **بس الـ defaults بتفضل شغالة**. فـ `PATCH {title: 'Renamed'}` كان بيرجع المهمة لـ `TODO` من غير ما حد يطلب. الـ test اللي اسمه `only changes the fields that were sent` هو اللي مسكه.
+- **`.strict()`:** من غيره حد يبعت `{"isAdmin": true}` أو `{"id": "..."}` والـ server يتجاهله بصمت أو يعدّيه.
+- **Validation في الـ server لازم** حتى لو الفورم بيعمل validation؛ أي حد يقدر يبعت request من غير الواجهة.

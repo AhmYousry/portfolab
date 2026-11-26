@@ -7,136 +7,124 @@ status: PUBLISHED
 checkpoints:
   - key: component-map
     title: رسمت خريطة الـ components
-    instructions: في `docs/frontend.md` اكتب كل component، الـ props بتاعته، والـ state اللي هو مسؤول عنه.
+    instructions: في `docs/frontend.md` كتبت كل component (App, TaskForm, Filters, TaskList)، الـ props بتاعته، والـ state اللي هو مسؤول عنه.
   - key: form-validation
     title: الفورم بيعمل validation ويعرض الخطأ
-    instructions: الضغط على "Add task" بعنوان فاضي بيعرض "Title is required" تحت الحقل ومبيبعتش request. شغل `npx vitest run` جوه `client` وتأكد إن `TaskForm.test.jsx` بيعدي.
+    instructions: على http://localhost:5174 الضغط على "Add task" بعنوان فاضي بيعرض "Title is required" تحت الحقل ومبيطبعش "TODO save" في الـ Console. وجوه فولدر `client` الأمر `npx vitest run` بيعدي كل تستات `TaskForm.test.jsx`.
   - key: labels
     title: كل input ليه label
-    instructions: كل input وselect في الفورم ليه `<label htmlFor>` مربوط بالـ `id` بتاعه. جرب تتنقل في الفورم بالـ Tab بس.
+    instructions: كل input وselect في الفورم ليه `<label htmlFor>` مربوط بالـ `id` بتاعه. الضغط على كلمة "Priority" بيركز على الـ select، وتقدر تتنقل في الفورم بالـ Tab بس.
 ---
 
-## الهدف من الدرس
+## الهدف
 
-تقسم الشاشة لـ components صغيرة، كل واحد مسؤول عن حاجة واحدة، وتبني `TaskForm` بـ validation وaccessibility صح.
+تبني فورم "New task" كامل: كل الحقول، رسالة خطأ واضحة، وaccessibility صح.
 
-**الوقت المتوقع:** ساعة وربع.
+**هتشوف في الآخر:** على http://localhost:5174 الفورم فيه Title, Description, Status, Priority, Due date. لو ضغطت **Add task** والعنوان فاضي، هتشوف `Title is required` تحت الحقل.
 
-## الخريطة
+**الوقت:** حوالي ساعة وربع.
 
-```text
-App                 ← يملك: tasks, filters, request status, editing
-├── TaskForm        ← يملك: قيم الفورم، أخطاء الحقول، submitting
-├── Filters         ← مفيش state؛ بياخد value ويبعت onChange
-└── TaskList        ← مفيش state؛ بيعرض وبيبعت events
+**الحالة دلوقتي بصراحة:** الفورم مش هيحفظ في الداتابيز لسه. `handleSave` في `App.jsx` بيطبع `TODO save` في الـ Console بس. الربط الحقيقي في Module 5.
+
+شغل الواجهة لو مش شغالة: من فولدر المشروع الرئيسي `npm run dev:client`.
+
+## الخطوات
+
+### 1. خريطة الـ components
+
+**فين:** AI chat، بعدين المحرر ← ملف جديد `docs/frontend.md`.
+
+**إنت تختار:** تخمينك: الـ state بتاع "المهمة اللي بعدلها دلوقتي" يعيش فين؟ `App` ولا `TaskForm` ولا `TaskList`؟
+
+```text prompt=TF07-1
+TaskFlow Lite's React client has these files in client/src: App.jsx, api.js, components/TaskForm.jsx, components/Filters.jsx (already done, no state), components/TaskList.jsx.
+My guess for where "the task I'm currently editing" state should live: {{App, TaskForm or TaskList}}.
+
+Give me a small component map as a tree. For each component list: props, the state it owns (or "none"), and the events it sends up. Then tell me if my guess is right using the rule "state lives in the closest component that needs it".
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep component, prop and file names in English.
+- No code yet; just the map and the short answer.
+- Stop at the end and wait for me to verify.
 ```
 
-**قاعدة:** الـ state يعيش في **أقرب component** محتاجه. الـ `tasks` في `App` لأن `TaskList` بيعرضها و`TaskForm` بيأثر فيها.
+**المتوقع:** شجرة: `App` فوق (بيملك tasks, filters, request status, editing)، وتحته `TaskForm` و`Filters` و`TaskList`.
 
-## TaskForm خطوة بخطوة
+**اتأكد بنفسك:** الصق الشجرة في `docs/frontend.md`. لازم `Filters` و`TaskList` يبقى قصادهم "no state".
 
-### 1. الـ state
+**وقف لو:** الـ AI اقترح Redux أو Context. مش محتاجينهم لصفحة واحدة.
 
-```js
-const [values, setValues] = useState(() => initialValues(task))
-const [errors, setErrors] = useState({})
-const [submitting, setSubmitting] = useState(false)
-const [serverError, setServerError] = useState('')
+### 2. ابني الفورم
+
+**فين:** المحرر ← `client/src/components/TaskForm.jsx`.
+
+**إنت تختار:** الـ priority الافتراضية اللي هتظهر في الفورم. لازم تبقى `MEDIUM` عشان تطابق الـ API والـ tests؛ إنت تختار **ترتيب** الحقول تحت الـ Title.
+
+```text prompt=TF07-2
+I'm on the "components" step of TaskFlow Lite. Edit only client/src/components/TaskForm.jsx (React 19). Keep the exported validateTask function and the default export.
+Order I want for the fields after Title: {{Your field order, e.g. Priority, Due date, Status, Description}}.
+
+Implement:
+- validateTask(values): { title: 'Title is required' } for a blank title, a max-120 message for long titles, {} otherwise.
+- Fields with <label htmlFor> and matching id: Title, Description (textarea), Status (TODO default), Priority (MEDIUM default; the label text must be exactly "Priority"), Due date (type="date").
+- On submit: validate first; if there are errors, show the title error under the field with aria-invalid and aria-describedby, and do NOT call onSave.
+- Otherwise call onSave with { title trimmed, description trimmed or null, status, priority, dueDate or null }.
+- Disable the submit button while saving. If onSave throws, show err.message in an element with role="alert". The button text stays "Add task".
+Leave edit mode (a task prop and a Cancel button) for a later lesson.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Touch only this file.
+- If you can edit my files, show the diff. If you can't, give me the exact final content of this one file.
+- Don't add dependencies, and never say you ran or tested something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-أربع حاجات مختلفة: قيم، أخطاء الحقول، هل بنحفظ دلوقتي، وخطأ راجع من الـ server.
+**المتوقع:** الصفحة اتحدثت لوحدها (Vite) والفورم بقى فيه 5 حقول.
 
-### 2. الـ validation في الـ client
+**اتأكد بنفسك:** اضغط **Add task** والعنوان فاضي: `Title is required` ظهرت، والـ Console **مفيهوش** `TODO save` جديد. اكتب عنوان واضغط تاني: الـ Console فيه `TODO save` ومعاه object فيه `title` و`priority` و`dueDate`.
 
-افصل الـ validation في function عادية عشان تقدر تختبرها لوحدها:
+**وقف لو:** الـ AI عدل `App.jsx`. ده مش الخطوة دي.
 
-```js spoiler
-// client/src/components/TaskForm.jsx
-export function validateTask(values) {
-  const errors = {}
-  const title = values.title.trim()
-  if (!title) errors.title = 'Title is required'
-  else if (title.length > TITLE_MAX) errors.title = `Title must be ${TITLE_MAX} characters or less`
-  return errors
-}
+### 3. شغل تستات الفورم وجرب بالكيبورد
+
+**فين:** terminal في فولدر `client`، بعدين المتصفح.
+
+**إنت تختار:** عنوان تجربه في الفورم بمسافات في الأول والآخر، زي `  Call the bank  `، عشان تشوف الـ trim.
+
+```bash
+cd client
+npx vitest run
 ```
 
-### 3. الـ accessibility
+```text prompt=TF07-3
+I ran `npx vitest run` in the client folder of TaskFlow Lite.
+Result (summary line, or the first failing test with expected vs received): {{Paste the test summary or first failure}}.
+In the browser I typed the title "{{Your title with spaces around it}}" and the console printed: {{Paste the TODO save line}}.
 
-دي مش "تحسينات"؛ دي جزء من إن الفورم شغال:
+Explain what each of the 4 tests in TaskForm.test.jsx proves. If one failed, point to the exact line in TaskForm.jsx to change and the smallest fix. Also confirm whether my console output shows the title was trimmed.
 
-```jsx
-<label htmlFor="title">Title</label>
-<input
-  id="title"
-  value={values.title}
-  onChange={update('title')}
-  aria-invalid={Boolean(errors.title)}
-  aria-describedby={errors.title ? 'title-error' : undefined}
-/>
-{errors.title && <p id="title-error" className="field-error">{errors.title}</p>}
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Fix only what a failing test needs, in TaskForm.jsx only.
+- If you can edit my files, show the diff. If you can't, show me exactly what to change.
+- Never say you ran or tested something you didn't.
+- Stop and wait for me to verify.
 ```
 
-- `htmlFor` + `id`: الضغط على الـ label يركز على الحقل، والـ screen reader يقرا الاسم.
-- `aria-invalid` و`aria-describedby`: الـ screen reader يقول إن في خطأ ويقرأه.
-- `noValidate` على الـ `<form>`: عشان رسايلنا تظهر بدل رسايل المتصفح المختلفة.
+**المتوقع:** `4 passed`.
 
-### 4. الـ submit
+**اتأكد بنفسك:** اضغط على كلمة **Priority** في الصفحة: الـ select لازم ياخد focus. وبعدين اتنقل بالـ Tab بس من Title لحد زرار Add task.
 
-```js spoiler
-// client/src/components/TaskForm.jsx
-async function handleSubmit(event) {
-  event.preventDefault()
-  const found = validateTask(values)
-  setErrors(found)
-  if (Object.keys(found).length > 0) return
-
-  setSubmitting(true)
-  setServerError('')
-  try {
-    await onSave({
-      title: values.title.trim(),
-      description: values.description.trim() || null,
-      status: values.status,
-      priority: values.priority,
-      dueDate: values.dueDate || null,
-    })
-    if (!task) setValues(initialValues(null))
-  } catch (err) {
-    setServerError(err.message)
-  } finally {
-    setSubmitting(false)
-  }
-}
-```
-
-لاحظ: الـ `description` الفاضي بيتبعت `null` مش `""`، والـ `dueDate` الفاضي `null`. ده بيطابق الـ contract.
-
-### 5. Edit mode
-
-الفورم نفسه بيستخدم للإضافة والتعديل. في `App` بنستخدم `key`:
-
-```jsx
-<TaskForm key={editing?.id ?? 'new'} task={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
-```
-
-تغيير الـ `key` بيخلي React يعمل الفورم من الأول بالقيم الجديدة. أبسط من `useEffect` بيزامن الـ state.
-
-## أخطاء شائعة
-
-- **`placeholder` بدل `label`:** الـ placeholder بيختفي لما تكتب، ومش كل screen readers بتقراه.
-- **زرار Submit مش disabled أثناء الحفظ:** المستخدم يضغط مرتين وتتعمل مهمتين.
-- **الاعتماد على validation الـ client بس:** افتكر Module 1.
-
-## AI mentor prompt (F05)
-
-```text prompt=F05
-Break my TaskFlow Lite React UI into small components and state responsibilities. Explain form validation, loading, empty and error states. Give an implementation order.
-```
-
-## Git commit
+**وقف لو:** test بيدور على `Priority` ومش لاقيه. الـ label لازم يبقى النص `Priority` بالظبط ومربوط بـ `htmlFor`.
 
 ```bash
 git add client/src/components docs/frontend.md
 git commit -m "feat(ui): add accessible task form with client-side validation"
 ```
+
+## ملاحظات تقنية (اختياري)
+
+- **`placeholder` مش بديل عن `label`:** بيختفي لما تكتب، ومش كل screen readers بتقراه.
+- **`noValidate` على الـ form:** عشان رسايلك إنت تظهر بدل رسايل المتصفح المختلفة.
+- **الـ description الفاضي بيتبعت `null` مش `""`** عشان يطابق الـ contract.

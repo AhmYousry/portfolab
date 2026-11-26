@@ -1,6 +1,14 @@
 # Implementation status — Portfolab
 
-Last updated: 2026-11-26 (managed Neon Auth verification)
+Last updated: 2026-11-26 (guided learner workflow review)
+
+## Guided learner workflow (2026-11-26)
+
+All 12 TaskFlow Lite lessons now identify where each action happens (AI chat, editor, terminal folder or browser), the learner's choice, the expected result and a manual check. The 42 lesson prompts are English and request simple Egyptian Arabic explanations, one small change at a time, followed by learner verification. Lessons 1–2 use conversation/notes before the repository exists. Setup starts with a visible frontend before database setup and explains the starter's unfinished behavior. Deployment remains optional.
+
+Prompt cards expose editable `{{...}}` choices, an English preview and copy disabled until all choices are filled. Multiline text and literal replacement characters are preserved; blocks are independent and reset across lesson changes. Copy failures are visible and analytics receive only prompt metadata. The landing copy, prompt resource and starter README match this workflow.
+
+Verified: 75 web tests, 20 API content/resource/progress tests, typecheck, lint, formatting and build; live lesson browser checks for customization/copy, navigation reset and a 390px mobile layout. A fresh isolated starter install and its health test passed, and the documented schema-check commands produced the expected results. All 33 checkpoint keys and existing database IDs/progress rows were preserved during content import. The AI's actual response quality remains dependent on the learner's external assistant; no model is embedded or called by the platform. Changes are prepared for local owner review before launch.
 
 ## Zero-budget beta
 

@@ -8,82 +8,113 @@ status: PUBLISHED
 checkpoints:
   - key: explain-layers
     title: أقدر أشرح مسؤولية الـ client والـ API والـ DB
-    instructions: اكتب في `docs/architecture.md` فقرة قصيرة لكل طبقة (client / API / database) بتقول هي مسؤولة عن إيه و**مش** مسؤولة عن إيه. اقرأها بصوت عالي كأنك في إنترفيو.
+    instructions: تقدر تقول بصوت عالي جملة لكل طبقة (React client / Express API / PostgreSQL) - هي مسؤولة عن إيه و**مش** مسؤولة عن إيه. اكتبهم في نفس الـ notes بتاعة الدرس اللي فات؛ لسه مش محتاج ملف في repo.
   - key: data-flow
     title: رسمت رحلة طلب "إضافة task"
-    instructions: ارسم (أو اكتب كخطوات مرقمة) رحلة الطلب من لحظة الضغط على "Add task" لحد ما الـ task تظهر في الليستة. لازم تذكر الـ HTTP method والـ status code المتوقع.
+    instructions: رسمت على ورقة (أو كتبت كخطوات مرقمة) رحلة الطلب من الضغط على "Add task" لحد ما الـ task تظهر في الليستة، وفيها `POST /api/tasks` والـ status code `201` (وكمان `400` لو العنوان فاضي).
   - key: tradeoff
     title: كتبت tradeoff واحد
-    instructions: اكتب قرار تقني واحد وبديله والسبب، مثلًا "PostgreSQL بدل localStorage لأن ..."
+    instructions: كتبت قرار تقني واحد وبديله والسبب في جملة، مثلًا "PostgreSQL بدل localStorage لأن ...".
 ---
 
-## الهدف من الدرس
+## الهدف
 
-تفهم **ليه** في 3 طبقات، ومسؤولية كل واحدة، وترسم رحلة طلب واحد من المتصفح لقاعدة البيانات ورجوعًا.
+تفهم ليه التطبيق متقسم 3 طبقات، وترسم رحلة طلب واحد من الزرار لحد الداتابيز ورجوعًا.
 
-**الوقت المتوقع:** 40 دقيقة.
+**هتشوف في الآخر:** رسمة على ورقة فيها 3 صناديق (React ← Express ← PostgreSQL) وأسهم مرقمة لرحلة "Add task"، وجملة tradeoff واحدة.
 
-## المشكلة
+**الوقت:** حوالي 40 دقيقة. **مش محتاج:** كود أو repo لسه.
 
-أحمد عمل app بـ React بيحفظ المهام في `localStorage`. اشتغل تمام لحد ما فتحه من الموبايل ولقى الليستة فاضية. وبعدين مسح الـ browser data وكل حاجة راحت.
-
-`localStorage` مش غلط؛ هو بس مش مكان لبيانات المفروض تعيش وتتشارك بين أجهزة. هنا بييجي دور الـ backend.
-
-## الطبقات التلاتة
+الصورة اللي هنوصلها (الأرقام دي هي الـ ports اللي هتشوفها فعلًا في الـ starter الدرس الجاي):
 
 ```text
-[ Browser: React ]  --HTTP JSON-->  [ Express API ]  --SQL (Prisma)-->  [ PostgreSQL ]
-       :5174                             :3001                              :5433
+[ Browser: React ]  --HTTP JSON-->  [ Express API ]  --Prisma-->  [ PostgreSQL ]
+   localhost:5174                    localhost:3001               localhost:5433
 ```
 
-| الطبقة | مسؤولة عن | مش مسؤولة عن |
-|---|---|---|
-| **Client (React)** | عرض البيانات، جمع input، feedback سريع (زي "العنوان مطلوب") | إنها تكون آخر خط دفاع؛ أي حد يقدر يبعت request من غير الـ UI |
-| **API (Express)** | التأكد من صحة البيانات (validation)، قواعد التطبيق، اختيار status codes، إخفاء تفاصيل الأخطاء | شكل الـ UI |
-| **Database (PostgreSQL)** | حفظ البيانات بشكل دائم وموثوق، الـ constraints، البحث والترتيب بكفاءة | قواعد الـ UI أو رسائل الخطأ |
+## الخطوات
 
-> **قاعدة ذهبية:** الـ validation في الـ client عشان راحة المستخدم. الـ validation في الـ server عشان الأمان. لازم الاتنين.
+### 1. افهم الطبقات التلاتة
 
-## رحلة طلب "إضافة task"
+**فين:** AI chat (نفس محادثة الدرس اللي فات لو موجودة).
 
-1. المستخدم يكتب "Write README" ويضغط **Add task**.
-2. الـ React form يتأكد إن العنوان مش فاضي (feedback سريع).
-3. الـ client يبعت `POST /api/tasks` بـ body: `{"title": "Write README"}`.
-4. الـ API يعمل validation بـ Zod. لو غلط → `400` مع تفاصيل الحقل الغلط.
-5. لو سليم، الـ API يطلب من Prisma يعمل `INSERT` في جدول `Task`.
-6. PostgreSQL يحفظ ويرجع الصف بالـ `id` والـ `createdAt`.
-7. الـ API يرد بـ `201 Created` و `{"data": {...task}}`.
-8. الـ client يعيد تحميل الليستة والـ task الجديدة تظهر.
+**إنت تختار:** إنت فاكر الـ validation (التأكد إن العنوان مش فاضي) مكانه فين. اكتب تخمينك حتى لو مش متأكد: `only in React`، `only in Express`، أو `both`.
 
-## ليه Express وPostgreSQL وPrisma؟
+```text prompt=TF02-1
+I'm planning TaskFlow Lite (single user): React client on port 5174, Express API on port 3001, PostgreSQL on port 5433, using Prisma.
+My guess for where "title must not be empty" should be checked: {{Your guess: React, Express, or both}}.
 
-- **Express:** بسيط ومنتشر جدًا، فهتلاقي مصادر كتير وهتفهم الـ HTTP بنفسك من غير سحر.
-- **PostgreSQL:** قاعدة بيانات relational جادة بتستخدمها شركات حقيقية. بتعلمك SQL وconstraints.
-- **Prisma:** بيخليك تكتب schema واضحة وmigrations متتبعة في Git، وبيحميك من SQL injection في الـ queries العادية لأنه بيستخدم parameterized queries.
+For each of the 3 layers, give me one line "responsible for" and one line "NOT responsible for".
+Then tell me if my guess is right, and why, using one example where someone skips the React UI completely.
+Finally, name 2 things beginners add to an app like this that it does NOT need (for example microservices or caching).
 
-ده **مش** الاختيار الوحيد الصح. الأهم إنك تعرف تبرر اختيارك.
-
-## أخطاء شائعة
-
-- **"الـ frontend بيعمل validation فخلاص":** أي حد يقدر يبعت request بـ `curl` ويتخطى الـ UI خالص.
-- **إن الـ API يرجع رسالة الخطأ بتاعة الداتابيز للمستخدم:** بتسرب تفاصيل داخلية (أسماء جداول، IPs). هنتعامل مع ده في Module 3.
-- **Over-engineering:** مش محتاج microservices ولا Redis ولا Docker Swarm لـ task manager شخصي.
-
-## AI mentor prompt (F02)
-
-```text prompt=F02
-Review my TaskFlow Lite requirements and propose a simple React + Express + PostgreSQL architecture. Explain data flow and why each layer exists. Flag unnecessary complexity.
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep technical terms in English.
+- No code and no files yet. Keep it short.
+- Stop at the end and wait for my reply.
 ```
 
-الصق الـ `docs/scope.md` بتاعك بعد الـ prompt. لو الـ AI اقترح حاجات زيادة (queues, caching)، ده تمرين كويس: اكتب ليه مش محتاجها دلوقتي.
+**المتوقع:** 6 سطور (2 لكل طبقة)، وتصحيح لتخمينك. الإجابة الصح: **الاتنين**؛ React عشان راحة المستخدم، وExpress عشان الأمان.
 
-## Stretch goal
+**اتأكد بنفسك:** غطي رد الـ AI وقول من دماغك جملة لكل طبقة. لو اتلخبطت في طبقة، ارجع اقراها.
 
-اكتب في `docs/architecture.md` إيه اللي هيتغير لو المشروع بقى لأكتر من مستخدم. (تلميح: auth، وكل task هيبقى ليها `userId`، وكل query لازم يفلتر بيه.) ده بالظبط اللي بنعمله في ExpensePilot.
+**وقف لو:** الـ AI بدأ يشرح Docker وKubernetes وqueues. قوله: `Keep it to the 3 layers only.`
 
-## Git commit
+### 2. ارسم رحلة "Add task"
 
-```bash
-git add docs/architecture.md
-git commit -m "docs: add architecture overview and request data flow"
+**فين:** ورقة وقلم.
+
+**إنت تختار:** عنوان مهمة حقيقية من حياتك هتمشي بيها الرحلة. مثال: `Submit CV to 3 companies`.
+
+```text prompt=TF02-2
+Walk me through what happens when I type the task title "{{Your task title}}" in TaskFlow Lite and press "Add task".
+Give me 7 to 9 numbered steps from the browser to PostgreSQL and back. Mention the HTTP method and path (POST /api/tasks), the JSON body, the success status code (201) and the response shape {"data": {...}}.
+Then add a short second path: what happens if the title is empty (400 with an error message), and which layer stops it.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep technical terms in English.
+- No code and no files yet. Keep it short.
+- Stop at the end and wait for my reply.
 ```
+
+**المتوقع:** خطوات مرقمة زي: React يتأكد ← يبعت `POST /api/tasks` ← Express يعمل validation ← Prisma يحفظ ← PostgreSQL يرجع الصف ← `201` ← الليستة تتحدث.
+
+**اتأكد بنفسك:** ارسم الخطوات كأسهم بين الـ 3 صناديق على الورقة. لازم تلاقي على الأسهم `POST`، `201`، و`400`.
+
+**وقف لو:** مش فاهم خطوة. اسأل عنها هي بس: `Explain step 5 only, with an everyday example.`
+
+### 3. اختار tradeoff واحد ودافع عنه
+
+**فين:** AI chat، وبعدين الـ notes بتاعتك.
+
+**إنت تختار:** قرار واحد من دول: `PostgreSQL instead of localStorage`، `Express instead of a full framework`، أو `Prisma instead of raw SQL`.
+
+```text prompt=TF02-3
+Act as a friendly interviewer. I chose this for TaskFlow Lite: {{Your decision, e.g. PostgreSQL instead of localStorage}}.
+Ask me ONE question about why. Wait for my answer. Then tell me what was good in my answer and give me a better one-sentence version I can say in an interview.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep technical terms in English.
+- No code and no files yet.
+- Ask your question, then stop and wait for my reply.
+```
+
+**المتوقع:** سؤال واحد، تجاوب إنت، وبعدين جملة محسنة.
+
+**اتأكد بنفسك:** اكتب الجملة النهائية في الـ notes بكلامك إنت، مش نسخ.
+
+**وقف لو:** الـ AI جاوب مكانك قبل ما تكتب. قوله: `Wait for my answer first.`
+
+## خلصت الدرس لما
+
+- تقدر تشرح الـ 3 طبقات من غير ما تبص.
+- عندك رسمة رحلة "Add task" فيها `POST` و`201` و`400`.
+- عندك جملة tradeoff واحدة بكلامك.
+
+الدرس الجاي هتنزل الـ starter وهتشوف الـ ports دي شغالة بعينك.
+
+## ملاحظات تقنية (اختياري)
+
+- **localStorage مش غلط**، بس البيانات بتعيش في متصفح واحد وبتضيع لو مسحت الـ browser data. الداتابيز بتعيش برا المتصفح.
+- **ليه Prisma؟** بيبعت القيم كـ parameters منفصلة عن الـ SQL، فبيحميك من SQL injection في الـ queries العادية.
+- **لو المشروع بقى لأكتر من مستخدم:** هتحتاج auth، وكل task هيبقى ليها `userId`، وكل query لازم يفلتر بيه.

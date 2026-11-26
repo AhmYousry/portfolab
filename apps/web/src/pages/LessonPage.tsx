@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { LessonView } from '@pb/shared'
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, Clock, Lock } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { useParams } from 'react-router'
 import { Container } from '../components/Layout'
-import { Markdown } from '../components/Markdown'
+import { Markdown, hasPromptBlocks } from '../components/Markdown'
 import { Badge, ButtonLink, Card, ErrorState, Loading, Notice, TrackedLink } from '../components/ui'
 import { ApiRequestError, api, errorMessage } from '../lib/api'
 import { analytics, trackClick } from '../lib/analytics'
@@ -30,6 +30,41 @@ function InlineCode({ text }: { text: string }) {
         ),
       )}
     </>
+  )
+}
+
+const ROUTE_STEPS = [
+  'اقرا هدف الخطوة',
+  'املا اختياراتك في خانات البرومبت',
+  'انسخه والصقه في شات الـAI بتاعك',
+  'اطلب منه يوريك النتيجة ويشرح كل تغيير',
+  'جرّب النتيجة بنفسك',
+] as const
+
+function PromptRoute() {
+  const titleId = useId()
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="mt-6 rounded-xl border border-line bg-ink-2/60 p-4"
+    >
+      <h2 id={titleId} className="mb-3 text-sm font-semibold text-paper/90">
+        إزاي تمشي في الدرس
+      </h2>
+      <ol className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted">
+        {ROUTE_STEPS.map((step, index) => (
+          <li key={step} className="flex items-center gap-2">
+            <span className="grid size-6 shrink-0 place-items-center rounded-full border border-amber/40 text-xs text-amber-2">
+              {index + 1}
+            </span>
+            {step}
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-xs leading-6 text-dim">
+        افتح مساعدك في تاب تانية، وخلّيه ينفّذ ويشرح خطوة واحدة على مشروعك كل مرة.
+      </p>
+    </section>
   )
 }
 
@@ -268,9 +303,11 @@ export function LessonPage() {
         <h1 className="text-[clamp(1.9rem,1.3rem+2.2vw,3rem)] font-bold leading-tight">
           {lesson.title}
         </h1>
+        {hasPromptBlocks(lesson.contentMarkdown) && <PromptRoute />}
       </header>
 
       <Markdown
+        key={lesson.id}
         source={lesson.contentMarkdown}
         onCodeAction={(action, block) => {
           const context = { project_id: slug, lesson_id: lessonSlug }

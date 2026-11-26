@@ -7,162 +7,166 @@ status: PUBLISHED
 checkpoints:
   - key: crud-works
     title: الخمس endpoints شغالين
-    instructions: جربت بـ curl أو Thunder Client - create وlist وget وpatch وdelete - وكل واحد رجع الـ status code اللي في الـ contract.
+    instructions: http://localhost:3001/api/tasks بقى بيرجع `{"data":[...]}` بدل `Not implemented yet`، وجربت create وlist وget وpatch وdelete وكل واحد رجع الـ status code اللي في `docs/api.md`.
   - key: invalid-400
     title: input غلط بيرجع 400
-    instructions: 'بعت `POST /api/tasks` بعنوان فاضي وبـ `{"status": "DOING"}` ورجعلك 400 مع `details` بتحدد الحقل.'
+    instructions: 'بعت `POST /api/tasks` بعنوان فاضي، وبعدين بـ `{"title":"ok","status":"DOING"}`، والاتنين رجعوا `400` مع `details` بتحدد الحقل الغلط.'
   - key: acceptance-tests
     title: الـ acceptance tests بتعدي
-    instructions: جوه `server` شغل `npx vitest run` - كل التستات في `tasks.test.js` لازم تعدي.
+    instructions: جوه فولدر `server` شغلت `npx vitest run` وكل التستات في `health.test.js` و`tasks.test.js` عدت.
 ---
 
-## الهدف من الدرس
+## الهدف
 
-تنفذ الـ service (كلام مع الداتابيز) والـ routes (كلام HTTP) لحد ما الـ acceptance tests اللي في الـ starter تعدي كلها.
+الـ API يبقى شغال بجد: تضيف مهمة وترجع تلاقيها، والـ acceptance tests اللي في الـ starter كلها تعدي.
 
-**الوقت المتوقع:** ساعة ونص.
+**هتشوف في الآخر:** http://localhost:3001/api/tasks في المتصفح بيعرض مهمتك بالـ JSON بدل `Not implemented yet`، و`npx vitest run` كله أخضر.
 
-## ليه نفصل routes عن service؟
+**الوقت:** حوالي ساعة ونص.
 
-| `task.routes.js` | `task.service.js` |
-|---|---|
-| يقرا `req`، يعمل validation، يختار status code | يتكلم مع Prisma بس |
-| ميعرفش SQL | ميعرفش HTTP |
+**الحالة دلوقتي بصراحة:** الواجهة على 5174 لسه **مش** هتعرض المهام. ده Module 4.
 
-الفصل ده بيخلي كل ملف صغير ومفهوم، وبيخليك تغير الداتابيز أو شكل الـ API من غير ما تكسر التاني.
+**التقسيمة:** `task.service.js` بيكلم Prisma بس ومبيعرفش HTTP. `task.routes.js` بيقرا الـ request، يعمل validation، ويختار الـ status code، ومبيعرفش SQL.
 
 ## الخطوات
 
-### 1. الـ service: list مع الفلترة والترتيب
+### 1. الـ service: list و get
 
-ابدأ بـ `listTasks`. محتاج تبني `where` و`orderBy`:
+**فين:** المحرر ← `server/src/tasks/task.service.js` (فيه `toResponse` جاهز و5 functions بترمي `not implemented`).
 
-- `status` و`priority`: لو `undefined`، Prisma بيتجاهلهم. مريح.
-- `search`: `{ title: { contains: search, mode: 'insensitive' } }`.
-- `sort`: `-dueDate` معناها تنازلي. المهام اللي من غير due date تيجي **في الآخر** (`nulls: 'last'`).
+**إنت تختار:** ترتيب المهام اللي من غير due date لما ترتب بالتاريخ. الـ tests مستنية إنها تيجي **في الآخر**؛ فكر ليه ده منطقي للمستخدم واكتبه في سطر.
 
-```js spoiler
-// server/src/tasks/task.service.js
-function orderBy(sort) {
-  const direction = sort.startsWith('-') ? 'desc' : 'asc'
-  const field = sort.replace('-', '')
-  if (field === 'dueDate') return [{ dueDate: { sort: direction, nulls: 'last' } }, { createdAt: 'desc' }]
-  return [{ createdAt: direction }]
-}
+```text prompt=TF06-1
+I'm on the "crud-endpoints" step of TaskFlow Lite. Edit only server/src/tasks/task.service.js. Prisma 6, PostgreSQL. Keep toResponse as it is.
+Why tasks without a due date should come last, in my words: {{Your reason in one line}}.
 
-export async function listTasks({ status, priority, search, sort }) {
-  const tasks = await prisma.task.findMany({
-    where: {
-      status,
-      priority,
-      ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
-    },
-    orderBy: orderBy(sort),
-  })
-  return tasks.map(toResponse)
-}
+Implement only listTasks and getTask:
+- listTasks({ status, priority, search, sort }): filter by status and priority when given; search the title case-insensitively; sort is one of createdAt, -createdAt, dueDate, -dueDate ("-" means descending); for dueDate sorting put null dates last, then newest createdAt. Return tasks mapped with toResponse.
+- getTask(id): return the task through toResponse, or null if it does not exist.
+Explain how Prisma keeps "search" safe from SQL injection.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Leave createTask, updateTask and deleteTask unchanged for now.
+- If you can edit my files, show the diff. If you can't, show me exactly what to replace in this one file.
+- Don't add dependencies, and never say you ran or tested something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-> **SQL injection؟** Prisma بيبعت القيم كـ parameters منفصلة عن الـ query، فـ `search = "'; DROP TABLE..."` بيتعامل معاها كنص عادي. خطر الـ injection بيرجع لو استخدمت `$queryRawUnsafe` مع string concatenation. متعملش كده.
+**المتوقع:** functionين بقوا حقيقيين، والـ 3 التانيين لسه بيرموا error.
 
-### 2. الـ service: create / update / delete
+**اتأكد بنفسك:** مفيش `$queryRawUnsafe` ولا string بيتلزق جوه SQL. كله `prisma.task.findMany` / `findUnique`.
 
-- `createTask`: حول `dueDate` من `"2026-12-01"` لـ `Date` قبل الحفظ.
-- `updateTask`: لو الـ task مش موجودة، رجع `null` (الـ route هيحولها لـ 404).
-- `deleteTask`: `deleteMany({ where: { id } })` بترجع `count`، فتقدر ترجع `true/false` من غير exception.
+**وقف لو:** الـ AI غير `task.routes.js` أو `toResponse`.
 
-```js spoiler
-// server/src/tasks/task.service.js
-function toDate(value) {
-  if (value === undefined) return undefined
-  if (value === null) return null
-  return new Date(`${value}T00:00:00.000Z`)
-}
+### 2. الـ service: create و update و delete
 
-export async function updateTask(id, input) {
-  const existing = await prisma.task.findUnique({ where: { id } })
-  if (!existing) return null
-  const task = await prisma.task.update({
-    where: { id },
-    data: { ...input, dueDate: toDate(input.dueDate) },
-  })
-  return toResponse(task)
-}
+**فين:** نفس الملف `server/src/tasks/task.service.js`.
 
-export async function deleteTask(id) {
-  const result = await prisma.task.deleteMany({ where: { id } })
-  return result.count > 0
-}
+**إنت تختار:** هل الـ delete لمهمة مش موجودة يرجع `404` ولا `204`؟ الـ tests بتاعتنا مستنية `404`. اكتب رأيك؛ الـ AI هيوضحلك الـ tradeoff.
+
+```text prompt=TF06-2
+Still in server/src/tasks/task.service.js for TaskFlow Lite. Implement only createTask, updateTask and deleteTask.
+My opinion on deleting a missing task (404 or 204) and why: {{Your opinion in one line}}.
+
+- createTask(input): convert dueDate "YYYY-MM-DD" to a Date at UTC midnight before saving; keep null as null.
+- updateTask(id, input): return null if the task does not exist; otherwise update only the fields sent. undefined means "don't touch", null means "clear the value".
+- deleteTask(id): return true if a row was deleted, false otherwise, without throwing for a missing id.
+All return values go through toResponse where a task is returned. Briefly react to my opinion: what are the pros and cons, and why my tests expect 404.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Touch only these three functions.
+- If you can edit my files, show the diff. If you can't, show me exactly what to replace in this one file.
+- Never say you ran or tested something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-لاحظ الفرق بين `undefined` (متغيرش الحقل) و`null` (امسح القيمة). Prisma بيتجاهل `undefined`.
+**المتوقع:** مفيش ولا `throw new Error('... not implemented yet')` فاضل في الملف.
+
+**اتأكد بنفسك:** دور في الملف على `not implemented`. لازم صفر نتايج.
+
+**وقف لو:** الـ update بيعمل `delete` وبعدين `create`. ده مش update.
 
 ### 3. الـ routes
 
-امسح الـ `taskRouter.all(...)` اللي بيرجع 501، واكتب الخمس routes. Express 5 بيمسك أي error من `async` function ويبعته للـ error handler أوتوماتيك، فمش محتاج `try/catch` في كل route.
+**فين:** المحرر ← `server/src/tasks/task.routes.js`، بعدين terminal الـ server، بعدين المتصفح.
 
-```js spoiler
-// server/src/tasks/task.routes.js
-taskRouter.post('/', async (req, res) => {
-  const input = validate(createTaskSchema, req.body)
-  res.status(201).json({ data: await createTask(input) })
-})
+**إنت تختار:** رسالة الـ 404. لازم تبقى مفهومة ومتكشفش تفاصيل داخلية. الافتراضي: `Task not found`.
 
-taskRouter.patch('/:id', async (req, res) => {
-  const id = validate(idSchema, req.params.id)
-  const input = validate(updateTaskSchema, req.body)
-  const task = await updateTask(id, input)
-  if (!task) throw new HttpError(404, 'Task not found')
-  res.json({ data: task })
-})
+```text prompt=TF06-3
+I'm wiring the routes of TaskFlow Lite. Edit only server/src/tasks/task.routes.js (Express 5).
+My 404 message: "{{Your 404 message}}".
 
-taskRouter.delete('/:id', async (req, res) => {
-  const id = validate(idSchema, req.params.id)
-  const deleted = await deleteTask(id)
-  if (!deleted) throw new HttpError(404, 'Task not found')
-  res.status(204).end()
-})
+Remove the taskRouter.all(...) that throws 501 and add the five routes from my contract, using validate(schema, value) and HttpError from ../http.js, the schemas from ./task.schema.js, and the service functions from ./task.service.js:
+GET / (validate req.query with listQuerySchema), GET /:id, POST / (201), PATCH /:id (200), DELETE /:id (204 with no body). Validate :id with idSchema. Throw HttpError(404, ...) when the service returns null or false.
+Explain why Express 5 does not need try/catch in each async route here.
+
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Do this step only. Touch only this file; don't change http.js or app.js.
+- If you can edit my files, show the diff. If you can't, give me the exact final content of this one file.
+- Tell me how to restart the server and which URL to open.
+- Never say you ran or tested something you didn't.
+- Stop when this step is done and wait for me to verify.
 ```
 
-### 4. جرب يدوي
+**المتوقع:** في terminal الـ server اعمل `Ctrl+C` وبعدين `npm run dev:server` تاني من فولدر المشروع الرئيسي (عشان يشوف الـ Prisma client الجديد بعد الـ migration).
+
+**اتأكد بنفسك:** افتح http://localhost:3001/api/tasks. لازم تشوف `{"data":[]}` بدل `Not implemented yet`. وhttp://localhost:3001/api/tasks?status=SOMEDAY لازم يرجع `Validation failed`.
+
+**وقف لو:** شفت `Something went wrong`. بص على الـ terminal بتاع الـ server، الـ error الحقيقي مكتوب هناك.
+
+### 4. جرب بإيدك وشغل الـ acceptance tests
+
+**فين:** terminal (على Windows استخدم **Git Bash**) في أي فولدر، بعدين المتصفح، بعدين terminal في `server`.
+
+**إنت تختار:** عنوان مهمتك الحقيقية والـ priority بتاعتها (`LOW` / `MEDIUM` / `HIGH`). غير `Write README` و`HIGH` تحت بقيمك.
 
 ```bash
-curl -X POST http://localhost:3001/api/tasks -H "Content-Type: application/json" -d "{\"title\":\"Write README\",\"priority\":\"HIGH\"}"
-curl "http://localhost:3001/api/tasks?priority=HIGH"
-curl -X POST http://localhost:3001/api/tasks -H "Content-Type: application/json" -d "{\"title\":\"\"}"
+curl -i -X POST http://localhost:3001/api/tasks -H "Content-Type: application/json" -d '{"title":"Write README","priority":"HIGH"}'
+curl -i -X POST http://localhost:3001/api/tasks -H "Content-Type: application/json" -d '{"title":""}'
+curl -i -X POST http://localhost:3001/api/tasks -H "Content-Type: application/json" -d '{"title":"ok","status":"DOING"}'
 ```
 
-### 5. شغل الـ acceptance tests
+افتح http://localhost:3001/api/tasks?priority=HIGH. مهمتك لازم تظهر. بعدين:
 
 ```bash
 cd server
 npx vitest run
 ```
 
-لو test فشل، **اقرا رسالة الفشل كويس**. هي بتقولك expected إيه وجالها إيه. ده أسرع debugging ممكن.
+```text prompt=TF06-4
+I'm checking my TaskFlow Lite API by hand and with the acceptance tests.
+Status lines I got from my 3 curl commands: {{Paste the 3 HTTP status lines}}.
+Vitest summary (or the first failing test with its expected vs received, no secrets): {{Paste the test summary or first failure}}.
 
-## أخطاء شائعة
+If everything passed, explain what each status code proves. If a test failed, explain what the failure message means, which ONE file most likely causes it, and the smallest change to try. Don't rewrite whole files.
 
-- **`findUnique` بعدين `delete` من غير تشيك:** `delete` بيرمي exception لو مش موجود، فهترجع 500 بدل 404.
-- **رجوع الـ `Date` object زي ما هو:** هيطلع `"2026-12-01T00:00:00.000Z"` والـ `<input type="date">` مش هيفهمه. عشان كده `toResponse`.
-- **`res.status(204).json(...)`:** الـ 204 معناها مفيش body.
-- **نسيان `await`:** الـ route هيرد قبل ما الداتابيز تخلص.
-
-## AI mentor prompt (F06)
-
-```text prompt=F06
-I'm implementing [feature]. Here is my code: [paste]. Give me hints first, then a small targeted example only if necessary. Preserve my existing style and explain every change.
+Rules for your answer:
+- Explain in simple Egyptian Arabic; keep code, file paths and commands in English.
+- Fix only what this failure needs, in one file.
+- If you can edit my files, show the diff. If you can't, show me exactly what to change.
+- Tell me exactly what to re-run and in which folder.
+- Never say you ran or tested something you didn't.
+- Stop and wait for me to verify.
 ```
 
-## Tradeoff تكتبه
+**المتوقع:** `201` للأول، `400` للتاني والتالت مع `details` فيها `title` و`status`. والـ tests كلها passed.
 
-"استخدمت `deleteMany` بدل `delete` عشان ..." أو "رجعت 404 بدل 204 لما المهمة مش موجودة لأن ...". (في فرق آراء حقيقي في الموضوع ده؛ المهم تبرر.)
+**اتأكد بنفسك:** في مخرجات الـ test دور على `only changes the fields that were sent` و`returns a safe 500 without leaking internals`. الاتنين لازم يبقوا ✓.
 
-## Git commit
+**وقف لو:** test فشل وإنت مش فاهم ليه. اقرا سطر `expected` و`received` الأول، وبعدين ابعت الـ prompt.
 
 ```bash
 git add server/src
 git commit -m "feat(api): implement task CRUD with filtering, search and sorting"
 ```
 
-> بعد ما تخلص الـ checkpoints دي، الـ **reference solution** الكاملة هتتفتح لك في صفحة الملفات.
+> بعد ما تخلص الـ checkpoints دي، الـ **reference solution** هتتفتح لك في صفحة الملفات. قارن بيها، متنسخش.
+
+## ملاحظات تقنية (اختياري)
+
+- **`findUnique` بعدين `delete`:** `delete` بيرمي exception لو المهمة مش موجودة، فهترجع `500` بدل `404`. `deleteMany` بيرجع `count` من غير exception.
+- **`res.status(204).json(...)` غلط:** الـ 204 معناها مفيش body. استخدم `.end()`.
+- **`toResponse`** بيحول التاريخ لـ `"2026-12-01"` عشان `<input type="date">` يفهمه.

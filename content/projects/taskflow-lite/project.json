@@ -18,11 +18,11 @@
   ],
   "skills": ["React", "Express", "PostgreSQL", "Prisma", "Zod", "REST", "Vitest", "Supertest", "Git"],
   "modules": [
-    { "key": "01-define", "title": "حدد المشكلة", "description": "User stories، الـ scope، wireframe، وشكل الـ architecture.", "order": 1, "status": "PUBLISHED" },
-    { "key": "02-workspace", "title": "جهز الـ workspace", "description": "Frontend وbackend وdatabase شغالين وhealth check ناجح.", "order": 2, "status": "PUBLISHED" },
-    { "key": "03-api", "title": "ابني الـ API", "description": "Data model، API contract، validation، وCRUD.", "order": 3, "status": "PUBLISHED" },
-    { "key": "04-ui", "title": "ابني الـ UI", "description": "Components، forms، filters، وحالات الـ loading/empty/error.", "order": 4, "status": "PUBLISHED" },
-    { "key": "05-integrate-test", "title": "اربط واختبر", "description": "اربط الـ frontend بالـ API واكتب tests بتثبت إن كله شغال.", "order": 5, "status": "PUBLISHED" },
-    { "key": "06-ship", "title": "اشحن واشرح", "description": "Security review، deployment، README، وتحضير الإنترفيو.", "order": 6, "status": "PUBLISHED" }
+    { "key": "01-define", "title": "حدد المشكلة", "description": "محادثة مع الـ AI ورسمة على ورقة: user stories، اللي مش هتعمله، والـ 3 طبقات. من غير كود ولا repo.", "order": 1, "status": "PUBLISHED" },
+    { "key": "02-workspace", "title": "جهز الـ workspace", "description": "الواجهة شغالة على 5174 الأول، بعدين الداتابيز والـ API على 3001 والـ health check أخضر.", "order": 2, "status": "PUBLISHED" },
+    { "key": "03-api", "title": "ابني الـ API", "description": "جدول Task، الـ contract، الـ validation، والـ CRUD لحد ما /api/tasks يرجع بيانات والـ acceptance tests تعدي.", "order": 3, "status": "PUBLISHED" },
+    { "key": "04-ui", "title": "ابني الـ UI", "description": "فورم بـ validation، ليستة المهام الحقيقية، وحالات loading/empty/error والفلاتر في المتصفح.", "order": 4, "status": "PUBLISHED" },
+    { "key": "05-integrate-test", "title": "اربط واختبر", "description": "إضافة وتعديل وحذف من الواجهة بتفضل بعد refresh، وtest كاتبه بإيدك.", "order": 5, "status": "PUBLISHED" },
+    { "key": "06-ship", "title": "اشحن واشرح", "description": "Security review، README بتاعك، GitHub، clean install، وتحضير الإنترفيو. النشر أونلاين اختياري.", "order": 6, "status": "PUBLISHED" }
   ]
 }

@@ -9,8 +9,7 @@ import {
 } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-
-const COPY_RESET_MS = 1500
+import { CopyStatus, PromptBlock, useClipboardCopy } from './PromptBlock'
 
 function textOf(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node)
@@ -28,9 +27,14 @@ type CodeActionHandler = (action: CodeAction, block: CodeBlockInfo) => void
 const CodeActionContext = createContext<CodeActionHandler | null>(null)
 
 const PROMPT_META = /\bprompt=([A-Za-z0-9_-]{1,32})\b/
+const PROMPT_FENCE = /^ {0,3}(?:`{3,}|~{3,})[^\n]*\bprompt=[A-Za-z0-9_-]/m
 
 export function promptIdFromMeta(meta: string): string | undefined {
   return PROMPT_META.exec(meta)?.[1]
+}
+
+export function hasPromptBlocks(source: string): boolean {
+  return PROMPT_FENCE.test(source)
 }
 
 function CodeBlock({
@@ -45,18 +49,49 @@ function CodeBlock({
   promptId?: string
 }) {
   const [revealed, setRevealed] = useState(!spoiler)
-  const [copied, setCopied] = useState(false)
   const onAction = useContext(CodeActionContext)
+  const { state: copyState, copy } = useClipboardCopy(() =>
+    onAction?.('copy', { language, promptId }),
+  )
+  const copied = copyState === 'copied'
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      onAction?.('copy', { language, promptId })
-      setTimeout(() => setCopied(false), COPY_RESET_MS)
-    } catch {
-      setCopied(false)
-    }
+  const spoilerToggle = spoiler ? (
+    <button
+      type="button"
+      onClick={() => {
+        if (!revealed) onAction?.('reveal', { language, promptId })
+        setRevealed((v) => !v)
+      }}
+      data-analytics-id="code-spoiler-toggle"
+      aria-expanded={revealed}
+      className="inline-flex items-center gap-1 text-amber-2 hover:text-amber"
+    >
+      {revealed ? (
+        <EyeOff className="size-3.5" aria-hidden />
+      ) : (
+        <Eye className="size-3.5" aria-hidden />
+      )}
+      {revealed ? 'اخفي الحل' : 'اكشف الحل (spoiler)'}
+    </button>
+  ) : null
+
+  const hiddenNotice = (
+    <p className="p-6 text-sm text-muted">
+      ده الحل المرجعي. جرب بنفسك الأول، وبعدين قارن. الكشف مش هيأثر على تقدمك.
+    </p>
+  )
+
+  if (promptId) {
+    return (
+      <PromptBlock
+        code={code}
+        revealed={revealed}
+        spoilerToggle={spoilerToggle}
+        hiddenNotice={hiddenNotice}
+        copyState={copyState}
+        onCopy={(text) => void copy(text)}
+      />
+    )
   }
 
   return (
@@ -66,29 +101,11 @@ function CodeBlock({
           {language || 'text'}
         </span>
         <span className="flex items-center gap-3">
-          {spoiler && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!revealed) onAction?.('reveal', { language, promptId })
-                setRevealed((v) => !v)
-              }}
-              data-analytics-id="code-spoiler-toggle"
-              aria-expanded={revealed}
-              className="inline-flex items-center gap-1 text-amber-2 hover:text-amber"
-            >
-              {revealed ? (
-                <EyeOff className="size-3.5" aria-hidden />
-              ) : (
-                <Eye className="size-3.5" aria-hidden />
-              )}
-              {revealed ? 'اخفي الحل' : 'اكشف الحل (spoiler)'}
-            </button>
-          )}
+          {spoilerToggle}
           {revealed && (
             <button
               type="button"
-              onClick={copy}
+              onClick={() => void copy(code)}
               data-analytics-id="code-copy"
               className="inline-flex items-center gap-1 hover:text-paper"
             >
@@ -111,10 +128,9 @@ function CodeBlock({
           <code>{code}</code>
         </pre>
       ) : (
-        <p className="p-6 text-sm text-muted">
-          ده الحل المرجعي. جرب بنفسك الأول، وبعدين قارن. الكشف مش هيأثر على تقدمك.
-        </p>
+        hiddenNotice
       )}
+      <CopyStatus state={copyState} />
     </figure>
   )
 }
@@ -132,6 +148,7 @@ function Pre({ children, node }: PreProps) {
   const code = textOf(children).replace(/\n$/, '')
   return (
     <CodeBlock
+      key={`${language}\u0000${meta}\u0000${code}`}
       language={language}
       code={code}
       spoiler={/\bspoiler\b/.test(meta)}

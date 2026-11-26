@@ -51,7 +51,7 @@ const OUTCOMES = [
   {
     icon: MessageSquareCode,
     title: 'AI كـ mentor',
-    body: '10 prompts بتخلي الـ AI يسألك ويراجعك بدل ما يكتب المشروع مكانك.',
+    body: 'بتعدّل prompts بالإنجليزي على مشروعك، والـ AI ينفذ خطوة صغيرة ويشرحلك كل تغيير، وانت تجرب النتيجة بنفسك قبل ما تكمل.',
   },
   {
     icon: FileCheck2,
